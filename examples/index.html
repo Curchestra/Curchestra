@@ -3,106 +3,488 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Curchestra demo</title>
+<title>Curchestra: a cursor orchestra that builds your page</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: #1c1c28; background: #fafafa; }
-  header, main, footer { max-width: 920px; margin: 0 auto; padding: 24px; }
-  header h1 { margin: 0 0 8px; font-size: 40px; }
-  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  .card { background: #fff; border: 1px solid #d8d8e4; border-radius: 8px; padding: 16px; }
-  .card img { display: block; width: 100%; height: 120px; background: #c5cae9; border-radius: 4px; margin-bottom: 8px; }
-  #features { background: #e8eaf6; border-radius: 8px; padding: 24px; margin: 24px 0; }
-  #stage { border: 2px solid #3949ab; border-radius: 8px; padding: 24px; margin: 24px 0; min-height: 160px; }
-  .spacer { height: 320px; }
-  button, select { font: inherit; }
-  #panel {
-    position: fixed; right: 16px; bottom: 16px; width: 260px; padding: 12px 16px; z-index: 2147483600;
-    background: #1a1a2e; color: #fff; border-radius: 8px; box-shadow: 0 4px 24px rgb(0 0 0 / 0.3); font-size: 14px;
+  :root {
+    --ink: #14141f;
+    --ink-2: #4a4a5e;
+    --ink-3: #8a8aa0;
+    --line: #e4e4ee;
+    --paper: #f7f7fb;
+    --card: #ffffff;
+    --accent: #5b5bf0;
+    --accent-2: #0d99ff;
+    --hot: #f24822;
+    --mint: #0acf83;
+    --sun: #ffc700;
+    --code: #16161f;
+    --radius: 14px;
+    --wrap: 1120px;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   }
-  #panel label { display: flex; justify-content: space-between; align-items: center; margin: 6px 0; gap: 8px; }
-  #panel .buttons { display: flex; gap: 6px; margin-top: 10px; }
-  #panel button { flex: 1; padding: 6px 4px; cursor: pointer; }
-  #panel h2 { margin: 0 0 4px; font-size: 15px; }
-  @media (max-width: 700px) { .cards { grid-template-columns: 1fr; } #panel { position: static; width: auto; margin: 16px; } }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: auto; }
+  body {
+    margin: 0;
+    font: 16px/1.6 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--ink);
+    background: var(--paper);
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  .wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 24px; }
+  section { padding: 96px 0; }
+  .eyebrow {
+    margin: 0 0 12px; font: 600 13px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent);
+  }
+  h2.title { margin: 0 0 16px; font-size: 44px; line-height: 1.1; letter-spacing: -0.03em; font-weight: 800; }
+  .lede { margin: 0; max-width: 620px; font-size: 18px; color: var(--ink-2); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 999px;
+    font: 600 15px/1 Inter, system-ui, sans-serif; text-decoration: none; cursor: pointer; border: 0;
+  }
+  .btn-primary { background: var(--ink); color: #fff; }
+  .btn-primary:hover { background: #2a2a3d; }
+  .btn-ghost { background: #ececf6; color: var(--ink); }
+  .btn-ghost:hover { background: #e0e0ef; }
+
+  /* nav */
+  .nav { border-bottom: 1px solid var(--line); }
+  .nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 72px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; letter-spacing: -0.02em; text-decoration: none; }
+  .brand svg { width: 28px; height: 28px; }
+  .links { display: flex; gap: 28px; font-size: 15px; color: var(--ink-2); }
+  .links a { text-decoration: none; }
+  .links a:hover { color: var(--ink); }
+
+  /* hero */
+  .hero { padding: 88px 0 72px; }
+  .hero .wrap { display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: center; }
+  .hero h1 { margin: 0 0 20px; font-size: 68px; line-height: 1.02; letter-spacing: -0.045em; font-weight: 800; }
+  .hero .lede { margin-bottom: 32px; }
+  .hero .ctas { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+  .hero .note { margin: 0; font-size: 14px; color: var(--ink-3); }
+  .window {
+    background: var(--card); border-radius: 18px; box-shadow: 0 30px 60px -20px rgb(20 20 40 / .25), 0 0 0 1px var(--line);
+    overflow: hidden;
+  }
+  .window .bar { display: flex; gap: 7px; padding: 14px 16px; background: #f1f1f7; }
+  .window .bar i { width: 11px; height: 11px; border-radius: 50%; background: #d4d4e2; }
+  .window .body { padding: 22px; display: grid; gap: 14px; }
+  .mock-banner { height: 150px; border-radius: 12px; display: block; width: 100%; }
+  .mock-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .mock-tile { height: 74px; border-radius: 10px; background: #f0f0fa; }
+  .mock-line { height: 12px; border-radius: 6px; background: #ececf6; }
+  .mock-line.short { width: 60%; }
+
+  /* stats */
+  .stats { padding: 32px 0 24px; }
+  .stats .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .stat { background: var(--card); border-radius: var(--radius); padding: 22px 24px; box-shadow: 0 0 0 1px var(--line); }
+  .stat b { display: block; font-size: 34px; letter-spacing: -0.03em; line-height: 1.1; }
+  .stat span { font-size: 14px; color: var(--ink-2); }
+
+  /* routines */
+  .routines .grid { margin-top: 48px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .routine { background: var(--card); border-radius: var(--radius); padding: 20px; box-shadow: 0 0 0 1px var(--line); }
+  .routine svg { display: block; width: 100%; height: 132px; border-radius: 10px; margin-bottom: 16px; }
+  .routine h3 { margin: 0 0 6px; font-size: 18px; letter-spacing: -0.01em; }
+  .routine p { margin: 0; font-size: 15px; color: var(--ink-2); }
+
+  /* how it works */
+  .how .wrap { display: grid; grid-template-columns: 1fr 1.1fr; gap: 64px; align-items: start; }
+  .steps { display: grid; gap: 28px; padding-top: 8px; }
+  .step-k { margin: 0; font: 500 13px/1 var(--mono); color: var(--accent); }
+  .step-t { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -0.01em; }
+  .step-d { margin: 0; color: var(--ink-2); }
+
+  /* code */
+  .code .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+  pre {
+    margin: 0; padding: 26px 28px; border-radius: 16px; background: var(--code); color: #e6e6f0; overflow: auto;
+    font: 14px/1.75 var(--mono); box-shadow: 0 24px 48px -24px rgb(20 20 40 / .5);
+  }
+  .tok-k { color: #c792ea; } .tok-s { color: #a5e38a; } .tok-c { color: #6b7088; } .tok-f { color: #82aaff; }
+  .checks { margin: 24px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; color: var(--ink-2); }
+  .checks li::before { content: "✓"; color: var(--mint); font-weight: 700; margin-right: 10px; }
+
+  /* live modes */
+  .modes .grid { margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .demo-box { border: 2px dashed #c9c9dc; border-radius: 18px; padding: 28px; min-height: 280px; }
+  .demo-box h3 { margin: 0 0 8px; font-size: 22px; }
+  .demo-box p { margin: 0 0 18px; color: var(--ink-2); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .chip { padding: 6px 12px; border-radius: 999px; background: #ececf6; font-size: 13px; font-weight: 600; }
+  .chip.a { background: #e3e3ff; color: #3b3bc4; } .chip.b { background: #dff7ec; color: #0b8a58; } .chip.c { background: #fff1d6; color: #9a6a00; }
+  .view-art { display: block; width: 100%; height: 96px; border-radius: 12px; margin-bottom: 18px; }
+
+  /* quote */
+  .quote { text-align: center; }
+  .quote blockquote { margin: 0 auto 20px; max-width: 820px; font-size: 32px; line-height: 1.3; letter-spacing: -0.02em; font-weight: 700; }
+  .quote cite { font-style: normal; color: var(--ink-2); }
+
+  /* cta + footer */
+  .cta { padding: 40px 0 96px; }
+  .cta .panel-dark {
+    border-radius: 24px; padding: 64px 56px; color: #fff;
+    background: radial-gradient(120% 140% at 0% 0%, #3b3bd6 0%, #1b1b3a 55%, #12121c 100%);
+  }
+  .cta h2 { margin: 0 0 12px; font-size: 48px; line-height: 1.05; letter-spacing: -0.035em; }
+  .cta p { margin: 0 0 28px; max-width: 520px; color: #c9c9e8; font-size: 18px; }
+  .cta .btn-primary { background: #fff; color: var(--ink); }
+  footer { border-top: 1px solid var(--line); padding: 48px 0 64px; }
+  footer .wrap { display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: 32px; }
+  .fcol h4 { margin: 0 0 12px; font-size: 14px; }
+  .fcol a { display: block; margin: 6px 0; font-size: 14px; color: var(--ink-2); text-decoration: none; }
+  .fine { margin: 10px 0 0; font-size: 14px; color: var(--ink-3); max-width: 280px; }
+
+  /* intro mark */
+  #intro {
+    position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 1;
+    transition: opacity .5s ease;
+  }
+  #intro.gone { opacity: 0; }
+  #intro-mark { width: 64px; height: 64px; }
+  #intro-hint {
+    position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); font: 500 13px/1 var(--mono); color: var(--ink-3);
+    letter-spacing: .04em;
+  }
+
+  /* control panel */
+  #panel {
+    position: fixed; right: 16px; bottom: 16px; width: 290px; z-index: 2147483600; color: #fff;
+    background: rgb(20 20 31 / .94); backdrop-filter: blur(10px); border-radius: 16px;
+    box-shadow: 0 16px 40px rgb(0 0 0 / .3); font-size: 13px;
+  }
+  #panel summary {
+    list-style: none; cursor: pointer; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center;
+    font-weight: 700; font-size: 14px;
+  }
+  #panel summary::-webkit-details-marker { display: none; }
+  #panel summary small { font: 500 11px/1 var(--mono); color: #9a9ab8; }
+  #panel .in { padding: 0 16px 16px; }
+  #panel label { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; gap: 8px; color: #c9c9e0; }
+  #panel select {
+    font: inherit; color: #fff; background: #2a2a3c; border: 1px solid #3a3a52; border-radius: 8px; padding: 4px 8px;
+  }
+  #panel .buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  #panel button {
+    font: 600 13px/1 Inter, system-ui, sans-serif; padding: 10px 8px; border-radius: 10px; cursor: pointer;
+    border: 1px solid #3a3a52; background: #24243a; color: #fff;
+  }
+  #panel button:hover { background: #303050; }
+  #panel button.main { grid-column: 1 / -1; background: var(--accent); border-color: var(--accent); }
+  #panel .status { margin: 12px 0 0; font: 500 11px/1.4 var(--mono); color: #9a9ab8; }
+
+  @media (max-width: 900px) {
+    .hero .wrap, .how .wrap, .code .wrap, .modes .grid { grid-template-columns: 1fr; }
+    .routines .grid { grid-template-columns: 1fr; }
+    .stats .grid { grid-template-columns: repeat(2, 1fr); }
+    footer .wrap { grid-template-columns: 1fr 1fr; }
+    .hero h1 { font-size: 48px; }
+    h2.title, .cta h2 { font-size: 34px; }
+    .links { display: none; }
+    #panel { left: 16px; right: 16px; width: auto; }
+  }
 </style>
 </head>
 <body>
-  <header>
-    <h1>Curchestra</h1>
-    <p>A swarm of cursors builds this page's real DOM, piece by piece. Everything you see is live HTML: select text, click links.</p>
-  </header>
-  <main>
-    <div class="cards">
-      <div class="card"><img alt="placeholder"><h3>Measure</h3><p>Only what is near the screen is scanned, as it is reached.</p></div>
-      <div class="card"><img alt="placeholder"><h3>Plan</h3><p>Parents are built before children; text is typed line by line.</p></div>
-      <div class="card"><img alt="placeholder"><h3>Reveal</h3><p>Clip-paths and fades uncover the page itself, never a copy.</p></div>
-    </div>
-    <section id="features">
-      <h2>Features</h2>
-      <p>Presets, typed options, HTML attributes, idle behaviors, reduced motion support and a failsafe that always reveals everything.</p>
-      <button type="button">A real, clickable button</button>
-    </section>
-    <div class="spacer"></div>
-    <section id="stage">
-      <h2 id="stage-title">View A</h2>
-      <p id="stage-body">This block is swapped by the transition button, with a cross-fade into a fresh build.</p>
-    </section>
-  </main>
-  <footer><p>Scroll down while it builds: the crew follows you.</p></footer>
 
-  <aside id="panel" data-cu-skip aria-label="Demo controls">
-    <h2>Curchestra demo</h2>
-    <label>Preset
-      <select id="preset"><option>default</option><option>calm</option><option>frenzy</option></select>
-    </label>
-    <label>idle.behavior
-      <select id="behavior"><option>orbit</option><option>flock</option><option>wander</option><option>leave</option><option>hide</option></select>
-    </label>
-    <label>idle.noPointer
-      <select id="nopointer"><option>last-touch</option><option>wander</option><option>stay</option></select>
-    </label>
-    <label>Sound <input id="sound" type="checkbox"></label>
-    <div class="buttons">
-      <button type="button" id="b-page">Page</button>
-      <button type="button" id="b-section">Section</button>
-      <button type="button" id="b-transition">Transition</button>
+  <nav class="nav">
+    <div class="wrap">
+      <a class="brand" href="#top" id="top">
+        <svg viewBox="0 0 28 28" aria-hidden="true"><path d="M5 3 L23 13 L14.5 15 L10.5 24 Z" fill="#14141f"/><circle cx="21" cy="21" r="4" fill="#5b5bf0"/></svg>
+        Curchestra
+      </a>
+      <div class="links"><a href="#routines">Routines</a><a href="#how">How it works</a><a href="#modes">Modes</a></div>
+      <a class="btn btn-primary" href="#start">Get started</a>
     </div>
-  </aside>
+  </nav>
+
+  <header class="hero">
+    <div class="wrap">
+      <div>
+        <p class="eyebrow">A cursor orchestra</p>
+        <h1>Your page, built live by a crew of cursors.</h1>
+        <p class="lede">Curchestra turns any website into a performance. Dozens of cursors drag out boxes, draw borders, type every line and snap text to guides, and they hurry up when you scroll.</p>
+        <div class="ctas"><a class="btn btn-primary" href="#start">npm install curchestra</a><a class="btn btn-ghost" href="#how">See how it works</a></div>
+        <p class="note">Zero dependencies. The page underneath stays real HTML.</p>
+      </div>
+      <div class="window" aria-hidden="true">
+        <div class="bar"><i></i><i></i><i></i></div>
+        <div class="body">
+          <svg class="mock-banner" viewBox="0 0 480 150" preserveAspectRatio="none"><defs><linearGradient id="hb" x2="1" y2="1"><stop stop-color="#5b5bf0"/><stop offset="1" stop-color="#0d99ff"/></linearGradient></defs><rect width="480" height="150" fill="url(#hb)"/><circle cx="400" cy="40" r="60" fill="#fff" opacity=".12"/><path d="M0 120 C120 70 220 150 480 90 L480 150 L0 150 Z" fill="#fff" opacity=".18"/></svg>
+          <div class="mock-row"><div class="mock-tile"></div><div class="mock-tile"></div><div class="mock-tile"></div></div>
+          <div class="mock-line"></div>
+          <div class="mock-line short"></div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="stats" aria-label="At a glance">
+    <div class="wrap grid">
+      <div class="stat"><b>48</b><span>cursors at full swarm</span></div>
+      <div class="stat"><b>6</b><span>design-tool routines</span></div>
+      <div class="stat"><b>0</b><span>runtime dependencies</span></div>
+      <div class="stat"><b>~20 kB</b><span>gzipped core</span></div>
+    </div>
+  </section>
+
+  <section class="routines" id="routines">
+    <div class="wrap">
+      <p class="eyebrow">What the cursors do</p>
+      <h2 class="title">Every piece gets the tool a designer would use.</h2>
+      <p class="lede">The scanner reads your real DOM and plans a job for each piece. Watch the cursor change shape as it switches tools.</p>
+      <div class="grid">
+        <article class="routine">
+          <svg viewBox="0 0 320 132" preserveAspectRatio="none" aria-hidden="true"><rect width="320" height="132" fill="#eef0ff"/><rect x="70" y="30" width="180" height="72" rx="8" fill="#fff" stroke="#0d99ff" stroke-width="2"/><g fill="#fff" stroke="#0d99ff" stroke-width="2"><rect x="66" y="26" width="8" height="8"/><rect x="246" y="26" width="8" height="8"/><rect x="66" y="98" width="8" height="8"/><rect x="246" y="98" width="8" height="8"/></g><rect x="124" y="110" width="72" height="16" rx="4" fill="#0d99ff"/></svg>
+          <h3>Boxes</h3>
+          <p>A crosshair drags from the corner with handles and a live size badge.</p>
+        </article>
+        <article class="routine">
+          <svg viewBox="0 0 320 132" preserveAspectRatio="none" aria-hidden="true"><rect width="320" height="132" fill="#fff4ec"/><path d="M60 100 L140 40 L200 80 L260 30" fill="none" stroke="#f24822" stroke-width="3"/><g fill="#fff" stroke="#f24822" stroke-width="2.5"><circle cx="60" cy="100" r="6"/><circle cx="140" cy="40" r="6"/><circle cx="200" cy="80" r="6"/><circle cx="260" cy="30" r="6"/></g></svg>
+          <h3>Borders</h3>
+          <p>The pen clicks each corner, leaving vertex dots along the path.</p>
+        </article>
+        <article class="routine">
+          <svg viewBox="0 0 320 132" preserveAspectRatio="none" aria-hidden="true"><rect width="320" height="132" fill="#eafaf3"/><rect x="40" y="38" width="200" height="14" rx="4" fill="#0acf83"/><rect x="40" y="62" width="150" height="10" rx="4" fill="#0acf83" opacity=".5"/><rect x="40" y="82" width="176" height="10" rx="4" fill="#0acf83" opacity=".5"/><rect x="220" y="78" width="3" height="18" fill="#14141f"/></svg>
+          <h3>Text</h3>
+          <p>The I-beam types like a person: bursts, little pauses, key clicks.</p>
+        </article>
+        <article class="routine">
+          <svg viewBox="0 0 320 132" preserveAspectRatio="none" aria-hidden="true"><rect width="320" height="132" fill="#f4efff"/><rect width="320" height="16" fill="#2c2c2c"/><rect width="16" height="132" fill="#2c2c2c"/><line x1="120" y1="0" x2="120" y2="132" stroke="#f24822" stroke-width="2"/><rect x="128" y="40" width="140" height="12" rx="4" fill="#9747ff"/><rect x="128" y="62" width="110" height="10" rx="4" fill="#9747ff" opacity=".5"/></svg>
+          <h3>Guides</h3>
+          <p>Rulers slide in, a guide is dragged out and text snaps onto it.</p>
+        </article>
+        <article class="routine">
+          <svg viewBox="0 0 320 132" preserveAspectRatio="none" aria-hidden="true"><rect width="320" height="132" fill="#fff9e0"/><rect x="40" y="30" width="100" height="72" rx="8" fill="#fff" stroke="#f24822" stroke-width="2"/><rect x="180" y="30" width="100" height="72" rx="8" fill="#fff" stroke="#f24822" stroke-width="2"/><line x1="140" y1="66" x2="180" y2="66" stroke="#f24822" stroke-width="2"/><rect x="146" y="72" width="28" height="14" rx="3" fill="#f24822"/></svg>
+          <h3>Repeats</h3>
+          <p>The first card is built, then alt-dragged into copies with spacing.</p>
+        </article>
+        <article class="routine">
+          <svg viewBox="0 0 320 132" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="im" x2="1" y2="1"><stop stop-color="#e8467c"/><stop offset="1" stop-color="#ffc700"/></linearGradient></defs><rect width="320" height="132" fill="url(#im)"/><path d="M40 110 L120 50 L170 90 L210 64 L280 110 Z" fill="#fff" opacity=".85"/><circle cx="240" cy="40" r="14" fill="#fff"/></svg>
+          <h3>Images</h3>
+          <p>A placeholder is dragged out, then the real image fades in with a chord.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="how" id="how">
+    <div class="wrap">
+      <div>
+        <p class="eyebrow">How it works</p>
+        <h2 class="title">It builds what you are looking at.</h2>
+        <p class="lede">Scroll slowly and a few cursors work through the page with you. Fling the page and the swarm floods in to catch up, and every cursor picks up the pace.</p>
+      </div>
+      <div class="steps">
+        <p class="step-k">01 / measure</p>
+        <p class="step-t">Only what is near the screen is scanned.</p>
+        <p class="step-d">Sections start as they approach. Nothing below the fold is hidden up front.</p>
+        <p class="step-k">02 / plan</p>
+        <p class="step-t">Parents first, then children, top to bottom.</p>
+        <p class="step-d">Repeated cards become duplicates, aligned text gets a guide to snap onto.</p>
+        <p class="step-k">03 / perform</p>
+        <p class="step-t">The real page is uncovered, never a copy.</p>
+        <p class="step-d">A failsafe always reveals everything, so readers and crawlers never miss a word.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="code" id="start">
+    <div class="wrap">
+      <div>
+        <p class="eyebrow">Get started</p>
+        <h2 class="title">One line for the whole show.</h2>
+        <p class="lede">Call it on a page, a single section, or as a transition between views.</p>
+        <ul class="checks">
+          <li>Typed config with presets: calm, default, frenzy</li>
+          <li>Respects reduced motion out of the box</li>
+          <li>Optional glass-piano soundtrack, all synthesized</li>
+        </ul>
+      </div>
+<pre><span class="tok-k">import</span> { curchestra } <span class="tok-k">from</span> <span class="tok-s">'curchestra'</span>;
+
+<span class="tok-c">// a ring of cursors circles your logo,</span>
+<span class="tok-c">// the first scroll sends them off to build</span>
+<span class="tok-f">curchestra</span>({ sound: <span class="tok-k">true</span> })
+  .<span class="tok-f">page</span>({ trigger: <span class="tok-s">'scroll'</span>, intro: <span class="tok-s">'#logo'</span> });
+
+<span class="tok-c">// or just one section, as it comes into view</span>
+<span class="tok-f">curchestra</span>().<span class="tok-f">section</span>(<span class="tok-s">'#features'</span>);</pre>
+    </div>
+  </section>
+
+  <section class="modes" id="modes">
+    <div class="wrap">
+      <p class="eyebrow">Live playground</p>
+      <h2 class="title">Try the other two modes, right here.</h2>
+      <p class="lede">These boxes are real sections of this page. Rebuild one, or swap the other to a new view with a transition.</p>
+      <div class="grid">
+        <div class="demo-box" id="live">
+          <div class="chips"><span class="chip a">section()</span><span class="chip">in-view</span><span class="chip">own edges</span></div>
+          <h3>A section with its own crew</h3>
+          <p>Its cursors enter and leave through this box's edges and never wander outside it.</p>
+          <button class="btn btn-primary" type="button" id="rebuild">Rebuild this section</button>
+        </div>
+        <div class="demo-box" id="stage">
+          <div class="chips"><span class="chip b" id="stage-chip">transition()</span><span class="chip">view A</span></div>
+          <svg class="view-art" id="stage-art" viewBox="0 0 480 96" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="va" x2="1"><stop stop-color="#0acf83"/><stop offset="1" stop-color="#0d99ff"/></linearGradient></defs><rect width="480" height="96" fill="url(#va)"/></svg>
+          <h3 id="stage-title">View A</h3>
+          <p id="stage-body">Press the button and this block swaps to new content, then the crew builds it.</p>
+          <button class="btn btn-primary" type="button" id="swap">Switch view</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="quote">
+    <div class="wrap">
+      <blockquote>“Nobody reads a landing page. Everybody watches one get built.”</blockquote>
+      <cite>A very convinced cursor</cite>
+    </div>
+  </section>
+
+  <section class="cta">
+    <div class="wrap">
+      <div class="panel-dark">
+        <h2>Let the orchestra play your page.</h2>
+        <p>Every line, box and border above was placed by a cursor working alongside the others.</p>
+        <a class="btn btn-primary" href="#top" id="again">Watch it again</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">
+      <div>
+        <a class="brand" href="#top">Curchestra</a>
+        <p class="fine">A cursor orchestra that builds your website's real DOM, piece by piece.</p>
+      </div>
+      <div class="fcol"><h4>Library</h4><a href="#routines">Routines</a><a href="#modes">Modes</a><a href="#start">Install</a></div>
+      <div class="fcol"><h4>Options</h4><a href="#start">Presets</a><a href="#start">Idle behaviors</a><a href="#start">Sound</a></div>
+      <div class="fcol"><h4>Project</h4><a href="#top">Changelog</a><a href="#top">License</a><a href="#top">GitHub</a></div>
+    </div>
+  </footer>
+
+  <div id="intro" data-cu-skip aria-hidden="true">
+    <svg id="intro-mark" viewBox="0 0 28 28"><path d="M5 3 L23 13 L14.5 15 L10.5 24 Z" fill="#d4d4e2"/><circle cx="21" cy="21" r="4" fill="#d4d4e2"/></svg>
+    <p id="intro-hint">scroll, click or poke the ring to begin</p>
+  </div>
+
+  <details id="panel" data-cu-skip open>
+    <summary>Curchestra playground <small id="state">ready</small></summary>
+    <div class="in">
+      <label>Preset
+        <select id="preset"><option>default</option><option>calm</option><option>frenzy</option></select>
+      </label>
+      <label>Idle behavior
+        <select id="behavior"><option>orbit</option><option>flock</option><option>wander</option><option>leave</option><option>hide</option></select>
+      </label>
+      <label>No pointer
+        <select id="nopointer"><option>last-touch</option><option>wander</option><option>stay</option></select>
+      </label>
+      <label>Sound <input id="sound" type="checkbox"></label>
+      <label>Name tags <input id="names" type="checkbox"></label>
+      <div class="buttons">
+        <button type="button" class="main" id="b-swarm">Replay intro, build on scroll</button>
+        <button type="button" id="b-page">Page now</button>
+        <button type="button" id="b-finish">Finish</button>
+      </div>
+      <p class="status" id="status">Tip: scroll fast to call in more cursors.</p>
+    </div>
+  </details>
 
   <script type="module">
     import { curchestra } from '/src/index.ts';
 
     const $ = (id) => document.getElementById(id);
-    let swarm = null;
+    let orchestra = null;
+    let tasks = 0;
 
-    function fresh() {
-      swarm?.destroy();
-      swarm = curchestra({
-        preset: $('preset').value,
-        idle: { behavior: $('behavior').value, noPointer: $('nopointer').value },
-        sound: $('sound').checked ? { volume: 0.4 } : false,
-      });
-      return swarm;
+    function setState(s) {
+      $('state').textContent = s;
     }
 
-    $('b-page').onclick = () => fresh().page();
-    $('b-section').onclick = () => fresh().section('#features', { trigger: 'load' });
+    function fresh() {
+      orchestra?.destroy();
+      tasks = 0;
+      orchestra = curchestra({
+        preset: $('preset').value,
+        idle: { behavior: $('behavior').value, noPointer: $('nopointer').value },
+        agents: { showNames: $('names').checked },
+        sound: $('sound').checked ? { volume: 0.4 } : false,
+      });
+      orchestra.on('task', () => {
+        tasks++;
+        if (tasks === 1) {
+          $('intro').classList.add('gone');
+          setState('building');
+        }
+        $('status').textContent = `${tasks} pieces placed`;
+      });
+      orchestra.on('complete', () => setState('built'));
+      return orchestra;
+    }
 
-    let b = false;
-    $('b-transition').onclick = () => {
-      b = !b;
-      return fresh().transition(
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    // bumped by every button so a delayed intro never overrides it
+    let gen = 0;
+    function swarm() {
+      const my = ++gen;
+      orchestra?.destroy();
+      orchestra = null;
+      $('intro').classList.remove('gone');
+      setState('waiting');
+      window.scrollTo(0, 0);
+      // wait for the scroll-to-top event first
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (my === gen) fresh().page({ trigger: 'scroll', intro: '#intro-mark' });
+      }));
+    }
+
+    $('b-swarm').onclick = swarm;
+    $('again').onclick = (e) => {
+      e.preventDefault();
+      swarm();
+    };
+    $('b-page').onclick = () => {
+      gen++;
+      $('intro').classList.add('gone');
+      setState('building');
+      fresh().page();
+    };
+    $('b-finish').onclick = () => orchestra?.finish();
+
+    $('rebuild').onclick = () => (orchestra ?? fresh()).section('#live', { trigger: 'load' });
+
+    const views = [
+      { title: 'View A', body: 'Press the button and this block swaps to new content, then the crew builds it.', a: '#0acf83', b: '#0d99ff', chip: 'view A' },
+      { title: 'View B', body: 'A different view, built by the orchestra right after the old one faded out.', a: '#e8467c', b: '#ffc700', chip: 'view B' },
+    ];
+    let v = 0;
+    $('swap').onclick = () => {
+      v = 1 - v;
+      const next = views[v];
+      (orchestra ?? fresh()).transition(
         () => {
-          $('stage-title').textContent = b ? 'View B' : 'View A';
-          $('stage-body').textContent = b
-            ? 'A different view, built by the swarm after the old one faded out.'
-            : 'This block is swapped by the transition button, with a cross-fade into a fresh build.';
+          $('stage-title').textContent = next.title;
+          $('stage-body').textContent = next.body;
+          $('stage-chip').nextElementSibling.textContent = next.chip;
+          const stops = $('stage-art').querySelectorAll('stop');
+          stops[0].setAttribute('stop-color', next.a);
+          stops[1].setAttribute('stop-color', next.b);
         },
         { root: '#stage' },
       );
     };
 
-    window.swarm = () => swarm;
+    window.orchestra = () => orchestra;
+    swarm();
   </script>
 </body>
 </html>
