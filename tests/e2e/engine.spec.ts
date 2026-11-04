@@ -315,6 +315,33 @@ test('an outer root skips an inner active area', async ({ page }) => {
   expect(r.hidden).toBe(0);
 });
 
+test('addArea reads the viewport before it marks the area', async ({ page }) => {
+  const marked = await page.evaluate(() => {
+    const w = window as any;
+    const cu = w.cu;
+    const base = cu.browserHost();
+    const root = document.querySelector('#cards')!;
+    let watching = false;
+    const seen: boolean[] = [];
+    const host = {
+      ...base,
+      viewport: () => {
+        if (watching) seen.push(root.hasAttribute('data-cu'));
+        return base.viewport();
+      },
+    };
+    const cfg = cu.resolveConfig({ seed: 1 });
+    const eng = cu.createEngine(host, cfg);
+    watching = true;
+    eng.addArea(root, cfg, 'section');
+    watching = false;
+    eng.destroy();
+    return seen;
+  });
+  expect(marked.length).toBeGreaterThan(0);
+  expect(marked.every((m) => m === false)).toBe(true);
+});
+
 test('cancel reveals without events; finish emits section:done', async ({ page }) => {
   const r = await page.evaluate(async () => {
     const cu = (window as any).cu;

@@ -81,9 +81,11 @@ export function buildArea(
 ): Omit<Area, 'run' | 'resolve'> {
   const pieces = dropInner(scan(host, root, { skip: cfg.skip, maxTasks: cfg.maxTasks }), inner);
   const { graph, ready } = plan(pieces, cfg.effects);
+  // Reads before the first write: a read after markArea would force a style recalc.
   const rect = readRect(root);
+  const vh = host.viewport().h;
   markArea(root, pieces.map((p) => p.el));
-  const sched = createScheduler(graph, host.viewport().h);
+  const sched = createScheduler(graph, vh);
   sched.add(ready);
   return { root, cfg, mode, pieces, graph, sched, left: graph.tasks.length, done: false, rect, pruned: new Set() };
 }

@@ -69,7 +69,8 @@ async function measure(page: Page, cdp: CDPSession, engine: Engine, fixture: str
 
   const t0 = await page.evaluate(() => performance.now());
   if (engine === 'curchestra') {
-    await page.evaluate(() => (window as any).Curchestra.curchestra({ seed: 1 }).page());
+    // A script tag, not page.evaluate, so the browser attributes long tasks to the call.
+    await page.addScriptTag({ content: 'Curchestra.curchestra({ seed: 1 }).page();' });
   } else {
     await page.addScriptTag({ path: SWARM_PATH });
   }

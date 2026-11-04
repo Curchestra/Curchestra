@@ -156,8 +156,7 @@ export function createStage(host: Host, zIndex: number, theme: 'light' | 'dark')
     }
   }
 
-  function draw(cursors: Cursor[], decos: Deco[], showNames: boolean): void {
-    const vp = host.viewport();
+  function draw(cursors: Cursor[], decos: Deco[], showNames: boolean, vp: { w: number; h: number }): void {
     const live = cursors.filter((c) => c.phase !== 'hidden' && c.alpha > 0);
     let cur: Rect | null = null;
     for (const d of decos) cur = union(cur, decoBounds(d, vp.h));

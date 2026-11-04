@@ -157,7 +157,8 @@ export type Deco =
   | { t: 'media'; r: Rect };
 
 export interface Stage {
-  draw(cursors: Cursor[], decos: Deco[], showNames: boolean): void;
+  /** `vp` is the viewport read in the frame's read phase: draw itself reads no layout. */
+  draw(cursors: Cursor[], decos: Deco[], showNames: boolean, vp: { w: number; h: number }): void;
   resize(): void;
   destroy(): void;
   el: HTMLCanvasElement;

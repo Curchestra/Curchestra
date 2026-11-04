@@ -413,7 +413,7 @@ export function createEngine(host: Host, config: Config): Engine {
     for (let i = areas.length - 1; i >= 0; i--) if (areas[i].left === 0) endArea(areas[i], true);
 
     // 5. Draw
-    stage.draw(cursors, decos, config.agents.showNames);
+    stage.draw(cursors, decos, config.agents.showNames, vp);
 
     // 6. Stats, events, continue
     frameMs.push(host.now() - t0);

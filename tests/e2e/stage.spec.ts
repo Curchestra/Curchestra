@@ -3,6 +3,9 @@ import { expect, test } from '@playwright/test';
 test.beforeEach(async ({ page }) => {
   await page.goto('/fixtures/lab.html');
   await page.waitForFunction(() => (window as any).cuReady === true);
+  await page.evaluate(() => {
+    (window as any).vp = () => ({ w: document.documentElement.clientWidth, h: innerHeight });
+  });
 });
 
 
@@ -62,10 +65,10 @@ test('draw paints cursor and clears when emptied', async ({ page }) => {
       sx: { x: 100, v: 0 }, sy: { x: 100, v: 0 },
       shape: 'arrow', press: 0, task: null, phase: 'idle', idleFor: 0, seedPhase: 0, alpha: 1,
     };
-    s.draw([c], [], true);
+    s.draw([c], [], true, (window as any).vp());
     const on = alpha(103, 103);
     const tag = alpha(125, 125);
-    s.draw([], [], true);
+    s.draw([], [], true, (window as any).vp());
     const off = alpha(103, 103);
     const tagOff = alpha(125, 125);
     s.destroy();
@@ -95,7 +98,7 @@ test('hidden cursors and all deco kinds draw without error', async ({ page }) =>
       { t: 'ghost', r: { x: 120, y: 120, w: 40, h: 40 }, color: '#f00' },
       { t: 'media', r: { x: 400, y: 400, w: 100, h: 80 } },
     ];
-    s.draw([base], decos, true);
+    s.draw([base], decos, true, (window as any).vp());
     const a = (x: number, y: number) => {
       const d = window.devicePixelRatio || 1;
       return s.el.getContext('2d').getImageData(Math.round(x * d), Math.round(y * d), 1, 1).data[3];
@@ -122,9 +125,9 @@ test('dirty rect: moving a cursor clears the old position', async ({ page }) => 
       sx: { x: 0, v: 0 }, sy: { x: 0, v: 0 },
       shape: 'arrow', press: 0, task: null, phase: 'idle', idleFor: 0, seedPhase: 0, alpha: 1,
     };
-    s.draw([c], [], false);
+    s.draw([c], [], false, (window as any).vp());
     const atA1 = a(103, 103);
-    s.draw([{ ...c, x: 400, y: 300 }], [], false);
+    s.draw([{ ...c, x: 400, y: 300 }], [], false, (window as any).vp());
     const out = { atA1, atA: a(103, 103), atB: a(403, 303) };
     s.destroy();
     return out;
@@ -132,4 +135,24 @@ test('dirty rect: moving a cursor clears the old position', async ({ page }) => 
   expect(r.atA1).toBeGreaterThan(0);
   expect(r.atA).toBe(0);
   expect(r.atB).toBeGreaterThan(0);
+});
+
+test('draw uses the viewport it is given and reads no layout itself', async ({ page }) => {
+  const calls = await page.evaluate(() => {
+    const cu = (window as any).cu;
+    const base = cu.browserHost();
+    let n = 0;
+    const host = { ...base, viewport: () => (n++, base.viewport()) };
+    const s = cu.createStage(host, 99, 'light');
+    n = 0;
+    const c = {
+      id: 1, name: 'Ada', color: '#F24E1E', x: 100, y: 100,
+      sx: { x: 100, v: 0 }, sy: { x: 100, v: 0 },
+      shape: 'arrow', press: 0, task: null, phase: 'idle', idleFor: 0, seedPhase: 0, alpha: 1,
+    };
+    s.draw([c], [{ t: 'guide', x: 50, color: '#f0f' }], true, (window as any).vp());
+    s.destroy();
+    return n;
+  });
+  expect(calls).toBe(0);
 });
