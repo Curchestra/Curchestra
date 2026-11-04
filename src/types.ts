@@ -81,3 +81,12 @@ export interface TaskGraph {
   tasks: Task[];
   pieceTask: Map<number, number>;
 }
+
+export interface Scheduler {
+  add(ids: number[]): void;
+  /** removes the chosen task from the queue and sets its state to 'active' */
+  pick(cursorDocY: number, viewTop: number, viewBot: number): number | null;
+  size(): number;
+  /** queued tasks in bands overlapping [viewTop - margin, viewBot + margin] */
+  inRange(viewTop: number, viewBot: number, margin: number): number;
+}
