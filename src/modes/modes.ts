@@ -181,8 +181,10 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
     const now: Slot[] = [];
     const lazy: Slot[] = [];
     for (const s of slots) {
-      if (s.cfg.trigger === 'load' || (s.cfg.trigger === 'in-view' && nearNow(s.root))) now.push(s);
-      else if (s.cfg.trigger === 'in-view') lazy.push(s);
+      // R31: in page mode 'load' means "now if near the viewport, else as it approaches".
+      const trigger = mode === 'page' && s.cfg.trigger === 'load' ? 'in-view' : s.cfg.trigger;
+      if (trigger === 'load' || (trigger === 'in-view' && nearNow(s.root))) now.push(s);
+      else if (trigger === 'in-view') lazy.push(s);
     }
     const started = now.length > 0;
     // R30: cu-ready first, so preload.css is not hiding what the scanner measures (same task, no paint).

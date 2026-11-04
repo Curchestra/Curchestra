@@ -18,29 +18,26 @@ export function attachSafety(engine: Engine, host: Host, cfg: Config): () => voi
   const doc = host.doc;
   const original = engine.addArea.bind(engine);
   const observers = new Set<MutationObserver>();
-  const active = new Set<Run>();
-  let timer = 0;
+  /** active runs and their failsafe timers (0 when none) */
+  const active = new Map<Run, number>();
   let off = false;
 
-  const clearTimer = () => {
-    if (timer) win.clearTimeout(timer);
-    timer = 0;
-  };
-  const offComplete = engine.on('complete', clearTimer);
-
-  function watch(root: Element, run: Run): void {
+  /** Watch a new area: live removals, plus a failsafe armed from this area's own start (R31). */
+  function watch(root: Element, run: Run, failsafe: number): void {
     const mo = new g.MutationObserver((recs) => {
       if (recs.some((r) => r.removedNodes.length > 0)) engine.__prune(root);
     });
     mo.observe(root, { childList: true, subtree: true });
     observers.add(mo);
-    active.add(run);
+    const timer = failsafe > 0 && Number.isFinite(failsafe) ? win.setTimeout(() => run.finish(), failsafe) : 0;
+    active.set(run, timer);
     const stop = () => {
       mo.disconnect();
       observers.delete(mo);
+      // However the area ended (finish, cancel, failsafe), disarm its timer.
+      const t = active.get(run);
+      if (t) win.clearTimeout(t);
       active.delete(run);
-      // However the last area ended (finish, cancel, failsafe), disarm the timer.
-      if (active.size === 0) clearTimer();
     };
     run.done.then(stop, stop);
   }
@@ -57,13 +54,8 @@ export function attachSafety(engine: Engine, host: Host, cfg: Config): () => voi
       revealArea(root, [...root.querySelectorAll('[data-cu]')]);
       return resolvedRun();
     }
-    watch(root, run);
-    if (!timer && area.failsafe > 0 && Number.isFinite(area.failsafe)) {
-      timer = win.setTimeout(() => {
-        timer = 0;
-        engine.finishAll();
-      }, area.failsafe);
-    }
+    // A root inside an active area gets that area's Run (R17): it is already watched.
+    if (!active.has(run)) watch(root, run, area.failsafe);
     return run;
   };
 
@@ -103,8 +95,8 @@ export function attachSafety(engine: Engine, host: Host, cfg: Config): () => voi
 
   return () => {
     off = true;
-    clearTimer();
-    offComplete();
+    for (const t of active.values()) if (t) win.clearTimeout(t);
+    active.clear();
     for (const mo of observers) mo.disconnect();
     observers.clear();
     doc.removeEventListener('pointerdown', onDown, true);

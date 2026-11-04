@@ -37,6 +37,34 @@ test.describe('api', () => {
     expect(built).toBe(true);
   });
 
+  test('page() default trigger: far sections are not hidden or scanned at start (R31)', async ({ page }) => {
+    await open(page, 'long.html');
+    const far = await page.evaluate(() => {
+      const run = (window as any).curchestra({ seed: 1 }).page();
+      const out = [3, 4, 5, 6, 7, 8, 9].map((i) => document.querySelector(`#s${i}`)!.hasAttribute('data-cu'));
+      run.finish();
+      return out;
+    });
+    expect(far).toEqual(Array(7).fill(false));
+  });
+
+  test('page(): a far section reached after the failsafe is still built by cursors (R31)', async ({ page }) => {
+    test.setTimeout(60_000);
+    await open(page, 'long.html');
+    await page.evaluate(() => {
+      const w = window as any;
+      w.tasksIn8 = 0;
+      const swarm = w.curchestra({ seed: 1, speed: 8, failsafe: 800 });
+      swarm.on('task', (p: any) => {
+        if (p?.el?.closest('#s8')) w.tasksIn8++;
+      });
+      swarm.page();
+    });
+    await page.waitForTimeout(1200);
+    await page.evaluate(() => document.querySelector('#s8')!.scrollIntoView());
+    await page.waitForFunction(() => (window as any).tasksIn8 > 0, null, { timeout: 10_000 });
+  });
+
   test('inner scroll container: a section build completes', async ({ page }) => {
     test.setTimeout(60_000);
     await open(page, 'inner-scroll.html');
@@ -129,6 +157,8 @@ test.describe('api', () => {
 
   test('page() twice returns the same Run and does no duplicate work; section() during page() reuses the area', async ({ page }) => {
     test.setTimeout(60_000);
+    // Tall enough that every section is near the viewport and starts at once (R31).
+    await page.setViewportSize({ width: 1280, height: 2000 });
     const run = async (twice: boolean) => {
       await open(page, 'landing.html');
       return page.evaluate(async (again) => {
