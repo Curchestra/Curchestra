@@ -14,7 +14,6 @@ export function createStage(host: Host, zIndex: number, theme: 'light' | 'dark')
   const el = host.doc.createElement('canvas');
   el.setAttribute('aria-hidden', 'true');
   el.style.cssText = `position:fixed;left:0;top:0;pointer-events:none;z-index:${zIndex}`;
-  host.doc.documentElement.appendChild(el);
   const ctx = el.getContext('2d') as CanvasRenderingContext2D;
   let dpr = 1;
   let prev: Rect | null = null;
@@ -31,6 +30,8 @@ export function createStage(host: Host, zIndex: number, theme: 'light' | 'dark')
     prev = null;
   }
   resize();
+  // Attached only once it works, so a failed start leaves no canvas behind.
+  host.doc.documentElement.appendChild(el);
 
   const widths = new Map<string, number>();
   function textWidth(font: string, text: string): number {

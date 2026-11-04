@@ -5,7 +5,9 @@ export function createScheduler(graph: TaskGraph, bandH: number): Scheduler {
   let count = 0;
   let minBand = Infinity;
   let maxBand = -Infinity;
-  const bandOf = (y: number) => Math.floor(y / bandH);
+  // A 0 px tall viewport (hidden iframe) would make every band Infinity/NaN and stall pick.
+  const h = Math.max(1, bandH);
+  const bandOf = (y: number) => Math.floor(y / h);
 
   function removeBucket(band: number): void {
     buckets.delete(band);

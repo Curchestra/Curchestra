@@ -2,6 +2,7 @@ import { resolveConfig, readDataAttrs } from '../config/resolve';
 import { validate } from '../config/validate';
 import { createEngine } from '../engine/engine';
 import { browserHost } from '../host/host';
+import { unmarkArea } from '../reveal/reveal';
 import type { Config, DeepPartial, Engine, EngineEvent, Host, Mode, Run } from '../types';
 
 export interface Curchestra {
@@ -131,12 +132,22 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
     return resolveConfig(base, globalCfg(), call, attrs);
   }
 
+  /** Reduced motion shows content at once: no engine, canvas, stylesheet or listeners. */
+  const reduced = (cfg: Config) => cfg.reducedMotion === 'respect' && host!.reducedMotion();
+
   function startSlot(slot: Slot, mode: Mode): void {
     if (slot.started) return;
     slot.started = true;
-    const run = getEngine().addArea(slot.root, slot.cfg, mode);
-    slot.run = run;
-    run.done.then(slot.settle);
+    try {
+      const run = getEngine().addArea(slot.root, slot.cfg, mode);
+      slot.run = run;
+      run.done.then(slot.settle);
+    } catch (err) {
+      // The engine could not start: show whatever may be marked and never leave done pending.
+      console.error('[curchestra]', err);
+      unmarkArea(slot.root, []);
+      slot.settle();
+    }
   }
 
   /** One aggregate Run over `roots`, each started by its own trigger. */
@@ -184,6 +195,11 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
     const now: Slot[] = [];
     const lazy: Slot[] = [];
     for (const s of slots) {
+      if (reduced(s.cfg)) {
+        s.started = true;
+        s.settle();
+        continue;
+      }
       // R31: in page mode 'load' means "now if near the viewport, else as it approaches".
       const trigger = mode === 'page' && s.cfg.trigger === 'load' ? 'in-view' : s.cfg.trigger;
       if (trigger === 'load' || (trigger === 'in-view' && nearNow(s.root))) now.push(s);
@@ -269,11 +285,16 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
         return;
       }
       const cfg = areaConfig(root, rest);
-      if (cfg.reducedMotion === 'respect' && host.reducedMotion()) {
+      let eng: Engine | null = null;
+      try {
+        if (!reduced(cfg)) eng = getEngine();
+      } catch (err) {
+        console.error('[curchestra]', err);
+      }
+      if (!eng) {
         await update();
         return;
       }
-      const eng = getEngine();
       /** The selector may now match a new element; an Element root is kept. */
       const current = () => {
         if (typeof rootOpt === 'string' && !root.isConnected) return resolveTarget(rootOpt) ?? doc.body;

@@ -306,6 +306,49 @@ test.describe('fix round 1', () => {
   });
 });
 
+test.describe('start-up failures and reduced motion', () => {
+  test('an engine that fails to start is logged, hides nothing, and the Run still settles', async ({ page }) => {
+    await open(page, 'spa.html');
+    const errors: string[] = [];
+    page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+    const r = await page.evaluate(async () => {
+      // No 2D context: createStage throws inside createEngine.
+      HTMLCanvasElement.prototype.getContext = () => null;
+      let threw = false;
+      let settled = false;
+      try {
+        const run = (window as any).curchestra({ seed: 1 }).section('#view-a', { trigger: 'load' });
+        await Promise.race([run.done.then(() => (settled = true)), new Promise((res) => setTimeout(res, 1000))]);
+      } catch {
+        threw = true;
+      }
+      return {
+        threw,
+        settled,
+        hidden: document.querySelectorAll('[data-cu="h"]').length,
+        ready: document.documentElement.classList.contains('cu-ready'),
+      };
+    });
+    expect(r).toEqual({ threw: false, settled: true, hidden: 0, ready: true });
+    expect(errors.some((e) => e.includes('[curchestra]'))).toBe(true);
+  });
+
+  test('reduced motion: page() creates no engine (no canvas, no stylesheet) and resolves', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await open(page, 'landing.html');
+    const r = await page.evaluate(async () => {
+      await (window as any).curchestra({ seed: 1 }).page().done;
+      return {
+        canvas: document.querySelectorAll('canvas').length,
+        styles: document.querySelectorAll('style[data-cu-style]').length,
+        attrs: document.querySelectorAll('[data-cu]').length,
+        ready: document.documentElement.classList.contains('cu-ready'),
+      };
+    });
+    expect(r).toEqual({ canvas: 0, styles: 0, attrs: 0, ready: true });
+  });
+});
+
 test.describe('instance-level keys', () => {
   for (const [key, opts] of [
     ['skipOnClick', { skipOnClick: false }],

@@ -20,6 +20,16 @@ function graphOf(specs: Array<[number, TaskType?]>): TaskGraph {
 const ids = (g: TaskGraph) => g.tasks.map((t) => t.id);
 
 describe('scheduler', () => {
+  it('a zero band height (0 px tall viewport or iframe) still picks every task', () => {
+    const g = graphOf([[0], [40], [300]]);
+    const s = createScheduler(g, 0);
+    s.add(ids(g));
+    expect(s.inRange(0, 0, 0)).toBeGreaterThan(0);
+    const got = [s.pick(0, 0, 0), s.pick(0, 0, 0), s.pick(0, 0, 0)];
+    expect(got.sort()).toEqual([0, 1, 2]);
+    expect(s.size()).toBe(0);
+  });
+
   it('picks the nearest band first', () => {
     const g = graphOf([[50], [250], [450]]);
     const s = createScheduler(g, 100);
