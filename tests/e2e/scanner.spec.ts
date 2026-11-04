@@ -6,7 +6,18 @@ const open = async (page: Page, name: string) => {
 };
 
 // Runs scan on the body and returns plain-data pieces (DOM ids instead of elements).
-const scanBody = (page: Page, opts: { skip?: string[]; maxTasks?: number } = {}) =>
+type Out = {
+  id: number;
+  kind: string;
+  parent: number | null;
+  sig: string;
+  rtl: boolean;
+  textLen: number;
+  domId: string;
+  tag: string;
+  rect: { x: number; y: number; w: number; h: number };
+};
+const scanBody = (page: Page, opts: { skip?: string[]; maxTasks?: number } = {}): Promise<Out[]> =>
   page.evaluate((o) => {
     const cu = (window as any).cu;
     const ps = cu.scan(cu.browserHost(), document.body, { skip: o.skip ?? [], maxTasks: o.maxTasks ?? 5000 });
