@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>landing</title>
+<style>
+  body { margin: 0; font: 16px/1.5 sans-serif; color: #222; }
+  #nav { position: sticky; top: 0; background: #1a1a2e; color: #fff; padding: 16px 24px; }
+  #nav a { color: #fff; margin-right: 16px; }
+  #hero { background: #e8eaf6; padding: 80px 24px; height: 360px; box-sizing: border-box; }
+  #hero .wrap { padding: 8px; }
+  #cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 24px; }
+  .card { background: #c5cae9; height: 140px; padding: 16px; box-sizing: border-box; }
+  #columns { padding: 24px; height: 420px; }
+  #columns p { margin: 0 0 16px; width: 480px; }
+  #quote { margin: 24px; padding: 16px; border: 2px solid #3949ab; background: none; }
+  #media { padding: 24px; height: 340px; box-sizing: border-box; }
+  #media img { width: 200px; height: 120px; margin-right: 16px; }
+  #rtl { padding: 24px; }
+  #shadow { display: block; margin: 24px; height: 100px; }
+  #cookie { position: fixed; bottom: 0; left: 0; right: 0; background: #333; color: #fff; padding: 12px; }
+  .spacer { height: 400px; }
+</style>
+</head>
+<body>
+  <nav id="nav"><a href="#hero">Home</a><a href="#cards">Cards</a><a href="#columns">Columns</a></nav>
+  <section id="hero">
+    <div class="wrap"><h1>Welcome to the landing page</h1></div>
+  </section>
+  <section id="cards">
+    <div class="card"><h3>One</h3><p>First card</p></div>
+    <div class="card"><h3>Two</h3><p>Second card</p></div>
+    <div class="card"><h3>Three</h3><p>Third card</p></div>
+    <div class="card"><h3>Four</h3><p>Fourth card</p></div>
+    <div class="card"><h3>Five</h3><p>Fifth card</p></div>
+    <div class="card"><h3>Six</h3><p>Sixth card</p></div>
+  </section>
+  <div class="spacer"></div>
+  <section id="columns">
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.</p>
+    <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo.</p>
+    <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
+    <p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim.</p>
+  </section>
+  <blockquote id="quote"><p>A quote with a border and no background.</p></blockquote>
+  <div class="spacer"></div>
+  <section id="media">
+    <img alt="a" src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='120'%3E%3Crect width='200' height='120' fill='%23f06292'/%3E%3C/svg%3E">
+    <img alt="b" src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='120'%3E%3Crect width='200' height='120' fill='%2381c784'/%3E%3C/svg%3E">
+  </section>
+  <p id="rtl" dir="rtl">مرحبا بالعالم، هذه فقرة من اليمين إلى اليسار.</p>
+  <fancy-box id="shadow"></fancy-box>
+  <div class="spacer"></div>
+  <div id="cookie" data-cu-skip>We use cookies. <button>OK</button></div>
+  <script>
+    customElements.define('fancy-box', class extends HTMLElement {
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' }).innerHTML =
+          '<div style="background:#ffd54f;height:100px">Shadow content</div>';
+      }
+    });
+  </script>
+  <script type="module">
+    import * as cu from '/src/testing.ts';
+    window.cu = cu;
+    window.cuReady = true;
+  </script>
+</body>
+</html>

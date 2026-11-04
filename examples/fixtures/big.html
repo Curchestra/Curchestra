@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>big</title>
+<style>body { margin: 0; font: 14px/1.4 sans-serif; } .g { margin: 2px; } .g div { height: 20px; }</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    const root = document.getElementById('root');
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < 2000; i++) {
+      const g = document.createElement('div');
+      g.className = 'g';
+      for (let j = 0; j < 10; j++) {
+        const d = document.createElement('div');
+        d.style.background = 'hsl(' + ((i * 10 + j) % 360) + ' 60% 80%)';
+        d.textContent = 'Item ' + i + '-' + j;
+        g.appendChild(d);
+      }
+      frag.appendChild(g);
+    }
+    root.appendChild(frag);
+    window.bigReady = true;
+  </script>
+  <script type="module">
+    import * as cu from '/src/testing.ts';
+    window.cu = cu;
+    window.cuReady = true;
+  </script>
+</body>
+</html>
