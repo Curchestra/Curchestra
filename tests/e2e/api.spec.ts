@@ -174,6 +174,80 @@ test.describe('api', () => {
   });
 });
 
+test.describe('fix round 1', () => {
+  test('page() after its Run completed returns that Run and does not rebuild', async ({ page }) => {
+    await open(page, 'spa.html');
+    const r = await page.evaluate(async () => {
+      const swarm = (window as any).curchestra({ seed: 1, speed: 12 });
+      const first = swarm.page();
+      await first.done;
+      let rehidden = 0;
+      new MutationObserver((recs) => {
+        for (const rec of recs) if ((rec.target as Element).getAttribute('data-cu') === 'h') rehidden++;
+      }).observe(document.body, { attributes: true, subtree: true, attributeFilter: ['data-cu'] });
+      const again = swarm.page();
+      await new Promise((res) => setTimeout(res, 100));
+      return { same: again === first, rehidden, left: document.querySelectorAll('[data-cu="h"]').length };
+    });
+    expect(r).toEqual({ same: true, rehidden: 0, left: 0 });
+  });
+
+  test('mixed triggers: an in-view area within a viewport is hidden before cu-ready is set', async ({ page }) => {
+    await open(page, 'long.html');
+    const order = await page.evaluate(async () => {
+      document.querySelector('#s0')!.setAttribute('data-cu-trigger', 'load');
+      const s1 = document.querySelector('#s1')!;
+      const log: string[] = [];
+      const mo = new MutationObserver((recs) => {
+        for (const rec of recs) {
+          if (rec.target === s1) log.push('s1-hidden');
+          else log.push('ready');
+        }
+      });
+      mo.observe(s1, { attributes: true, attributeFilter: ['data-cu'] });
+      mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+      (window as any).curchestra({ seed: 1, trigger: 'in-view' }).page().finish();
+      await new Promise((res) => setTimeout(res, 50));
+      return log;
+    });
+    expect(order[0]).toBe('s1-hidden');
+    expect(order).toContain('ready');
+  });
+
+  test('per-call frenzy bounds (min 36, max 48) raise the crew above the instance maximum of 30', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto('/fixtures/big.html');
+    await page.waitForFunction(() => (window as any).cuReady === true && (window as any).bigReady === true);
+    const peak = await page.evaluate(async () => {
+      const cu = (window as any).cu;
+      const eng = cu.createEngine(cu.browserHost(), cu.resolveConfig({ seed: 1 }));
+      const run = eng.addArea(document.body, cu.resolveConfig({ seed: 1, preset: 'frenzy', agents: { min: 36 } }), 'page');
+      let max = 0;
+      const until = performance.now() + 20_000;
+      while (performance.now() < until && max <= 30) {
+        await new Promise((res) => setTimeout(res, 200));
+        max = Math.max(max, eng.stats().cursors.length);
+      }
+      run.cancel();
+      eng.destroy();
+      return max;
+    });
+    expect(peak).toBeGreaterThan(30);
+  });
+
+  test('instance-level keys in per-call options warn once in dev', async ({ page }) => {
+    await open(page, 'spa.html');
+    const warnings: string[] = [];
+    page.on('console', (m) => m.type() === 'warning' && warnings.push(m.text()));
+    await page.evaluate(() => {
+      const swarm = (window as any).curchestra({ seed: 1, speed: 12 });
+      swarm.section('#view-a', { seed: 5, trigger: 'load' });
+      swarm.section('#app', { theme: 'dark', trigger: 'manual' });
+    });
+    expect(warnings.filter((w) => w.includes('seed') || w.includes('theme'))).toHaveLength(1);
+  });
+});
+
 test.describe('script tag', () => {
   test('the IIFE build reads data-curchestra, adds cu-ready and builds the page', async ({ page }) => {
     await page.goto('/fixtures/script-tag.html');
@@ -197,4 +271,13 @@ test.describe('script tag', () => {
     });
     expect(await page.evaluate(() => document.documentElement.classList.contains('cu-ready'))).toBe(false);
   });
+
+  for (const mode of ['none', 'bogus']) {
+    test(`data-curchestra="${mode}" adds cu-ready so preload.css does not hide the content`, async ({ page }) => {
+      await page.goto(`/fixtures/script-${mode}.html`);
+      await page.waitForFunction(() => document.documentElement.classList.contains('cu-ready'), null, { timeout: 1000 });
+      expect(await page.evaluate(() => getComputedStyle(document.querySelector('#only')!).visibility)).toBe('visible');
+      expect(await page.evaluate(() => document.querySelectorAll('[data-cu]').length)).toBe(0);
+    });
+  }
 });

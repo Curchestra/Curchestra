@@ -39,9 +39,9 @@ export function readDataAttrs(el: Element): DeepPartial<Config> {
   const preset = el.getAttribute('data-preset');
   if (preset) out.preset = preset as Config['preset'];
   const trigger = el.getAttribute('data-cu-trigger');
-  if (trigger) out.trigger = trigger as Config['trigger'];
+  if (trigger === 'load' || trigger === 'in-view' || trigger === 'manual') out.trigger = trigger;
   const speed = el.getAttribute('data-cu-speed');
-  if (speed !== null && speed.trim() !== '' && Number.isFinite(Number(speed))) out.speed = Number(speed);
+  if (speed !== null && speed.trim() !== '' && Number(speed) > 0 && Number.isFinite(Number(speed))) out.speed = Number(speed);
   const idle = el.getAttribute('data-cu-idle');
   if (idle) out.idle = { behavior: idle as Config['idle']['behavior'] };
   return out;

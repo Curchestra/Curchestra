@@ -18,8 +18,8 @@ export interface Curchestra {
   on(e: EngineEvent, fn: (p?: unknown) => void): () => void;
 }
 
-/** Dev-only validation (R23): bundlers replace the NODE_ENV literal, so production drops it. */
-const DEV = typeof process !== 'undefined' && process.env.NODE_ENV !== 'production';
+// Dev-only code (R25) is guarded by the literal `process.env.NODE_ENV !== 'production'` at each use:
+// a named constant is not constant-folded by bundlers, the literal comparison is.
 
 const FADE_MS = 180;
 const SKIP_TAGS = new Set(['script', 'style', 'link', 'template', 'noscript']);
@@ -74,7 +74,7 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
 
   /** The layer that reaches resolveConfig: validated in dev, minimally sanitized otherwise. */
   function clean(input: unknown): DeepPartial<Config> {
-    if (DEV) return validate(input, undefined, selOk);
+    if (process.env.NODE_ENV !== 'production') return validate(input, undefined, selOk);
     if (!isPlain(input)) return {};
     if (!('skip' in input)) return input as DeepPartial<Config>;
     const skip = Array.isArray(input.skip) ? input.skip.filter((s) => typeof s === 'string' && selOk(s)) : [];
@@ -100,15 +100,28 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
 
   const markReady = () => doc.documentElement.classList.add('cu-ready');
 
+  let warnedInstance = false;
+  /** seed, theme, zIndex and agents.showNames belong to the shared canvas and RNG (R27). */
+  function warnInstanceLevel(layer: DeepPartial<Config>): void {
+    if (process.env.NODE_ENV === 'production' || warnedInstance) return;
+    const hit = ['seed', 'theme', 'zIndex'].find((k) => k in layer) ?? (layer.agents && 'showNames' in layer.agents ? 'agents.showNames' : '');
+    if (!hit) return;
+    warnedInstance = true;
+    console.warn(`[curchestra] ${hit}: only applies to curchestra(config); ignored for this call`);
+  }
+
   function areaConfig(root: Element, opts: unknown, base?: DeepPartial<Config>): Config {
-    return resolveConfig(base, globalCfg(), clean(opts), clean(readDataAttrs(root)));
+    const call = clean(opts);
+    const attrs = clean(readDataAttrs(root));
+    warnInstanceLevel(call);
+    warnInstanceLevel(attrs);
+    return resolveConfig(base, globalCfg(), call, attrs);
   }
 
   function startSlot(slot: Slot, mode: Mode): void {
     if (slot.started) return;
     slot.started = true;
     const run = getEngine().addArea(slot.root, slot.cfg, mode);
-    markReady();
     slot.run = run;
     run.done.then(slot.settle);
   }
@@ -148,14 +161,25 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
     };
     groups.add(run);
 
+    // Areas the observer would fire for at once start now, so cu-ready never precedes their hiding.
+    const vh = host!.viewport().h;
+    const nearNow = (el: Element) => {
+      const r = el.getBoundingClientRect();
+      return r.bottom >= -vh && r.top <= 2 * vh;
+    };
     const lazy: Slot[] = [];
+    let started = false;
     for (const s of slots) {
-      if (s.cfg.trigger === 'load') startSlot(s, mode);
-      else if (s.cfg.trigger === 'in-view') lazy.push(s);
+      if (s.cfg.trigger === 'load' || (s.cfg.trigger === 'in-view' && nearNow(s.root))) {
+        startSlot(s, mode);
+        started = true;
+      } else if (s.cfg.trigger === 'in-view') lazy.push(s);
     }
+    if (started) markReady();
     if (lazy.length) {
       if (typeof g.IntersectionObserver === 'undefined') {
         for (const s of lazy) startSlot(s, mode);
+        markReady();
       } else {
         observer = new g.IntersectionObserver(
           (entries) => {
@@ -165,6 +189,7 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
               observer?.unobserve(en.target);
               bySlot.delete(en.target);
               startSlot(s, mode);
+              markReady();
             }
           },
           { rootMargin: '100% 0px' },
@@ -177,7 +202,7 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
       }
     }
     // Nothing will be hidden until a trigger fires (manual only): do not keep preload.css hiding it.
-    if (slots.every((s) => !s.started) && lazy.length === 0) markReady();
+    if (!started && lazy.length === 0) markReady();
     return run;
   }
 
@@ -206,9 +231,6 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
       if (pageRun) return pageRun;
       const run = group(pageAreas(), 'page', opts);
       pageRun = run;
-      run.done.then(() => {
-        if (pageRun === run) pageRun = null;
-      });
       return run;
     },
 

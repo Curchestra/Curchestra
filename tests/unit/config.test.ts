@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { resolveConfig } from '../../src/config/resolve';
+import { readDataAttrs } from '../../src/config/resolve';
 import { validate } from '../../src/config/validate';
 
 describe('config', () => {
@@ -38,6 +39,13 @@ describe('config', () => {
     expect(out).toEqual({ skip: ['.a', '#c'] });
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toContain('b[[');
+  });
+  test('readDataAttrs ignores unknown triggers and non-positive or NaN speeds', () => {
+    const el = (attrs: Record<string, string>) => ({ getAttribute: (n: string) => attrs[n] ?? null }) as unknown as Element;
+    expect(readDataAttrs(el({ 'data-cu-trigger': 'sometimes' }))).toEqual({});
+    expect(readDataAttrs(el({ 'data-cu-trigger': 'manual' }))).toEqual({ trigger: 'manual' });
+    for (const bad of ['0', '-2', 'abc']) expect(readDataAttrs(el({ 'data-cu-speed': bad }))).toEqual({});
+    expect(readDataAttrs(el({ 'data-cu-speed': '2' }))).toEqual({ speed: 2 });
   });
   test('agents.min > max is clamped', () => {
     expect(resolveConfig({ agents: { min: 40, max: 10 } }).agents).toMatchObject({ min: 10, max: 10 });

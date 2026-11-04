@@ -11,7 +11,11 @@ const script = typeof document !== 'undefined' ? document.currentScript : null;
 
 function boot(): void {
   const mode = script?.getAttribute('data-curchestra');
-  if (mode !== 'page' && mode !== 'section') return;
+  if (mode !== 'page' && mode !== 'section') {
+    // Nothing will build: do not leave preload.css hiding the content until the failsafe.
+    document.documentElement.classList.add('cu-ready');
+    return;
+  }
   const preset = script!.getAttribute('data-preset');
   const swarm = curchestra(preset ? { preset: preset as 'calm' | 'default' | 'frenzy' } : undefined);
   if (mode === 'page') swarm.page();

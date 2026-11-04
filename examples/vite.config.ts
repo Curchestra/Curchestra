@@ -23,6 +23,7 @@ const serveDist: Plugin = {
 
 export default defineConfig({
   plugins: [serveDist],
+  define: { 'process.env.NODE_ENV': '"development"' },
   root: here,
   resolve: { alias: { '/src': path.resolve(repo, 'src') } },
   server: { fs: { allow: [repo] } },

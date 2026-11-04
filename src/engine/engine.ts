@@ -245,7 +245,14 @@ export function createEngine(host: Host, config: Config): Engine {
       inRange += a.sched.inRange(sc.y, sc.y + vp.h, vp.h);
       queuedAll += a.sched.size();
     }
-    const target = crewTarget({ min: config.agents.min, max: config.agents.max, backlogInRange: inRange, scrollSpeed });
+    // Crew bounds: the largest min / max among the active areas (R27); instance config when none.
+    let bMin = areas.length ? 0 : config.agents.min;
+    let bMax = areas.length ? 0 : config.agents.max;
+    for (const a of areas) {
+      bMin = Math.max(bMin, a.cfg.agents.min);
+      bMax = Math.max(bMax, a.cfg.agents.max);
+    }
+    const target = crewTarget({ min: bMin, max: bMax, backlogInRange: inRange, scrollSpeed });
     for (const k of crew) {
       if (k.c.task !== null || k.c.phase === 'leave' || queuedAll === 0) continue;
       if (assign(k, { x: k.c.x, y: k.c.y }, sc, vp)) {
