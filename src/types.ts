@@ -125,3 +125,40 @@ export type RevealOp =
   | { op: 'fade'; el: Element; ms: number }
   | { op: 'clip'; el: Element; lines: Rect[]; progress: number; rtl: boolean }
   | { op: 'unclip'; el: Element };
+
+export type CursorShape = 'arrow' | 'cross' | 'ibeam' | 'pen' | 'dup';
+
+export interface Cursor {
+  id: number;
+  name: string;
+  color: string;
+  /** viewport coords */
+  x: number;
+  y: number;
+  sx: { x: number; v: number };
+  sy: { x: number; v: number };
+  shape: CursorShape;
+  /** 0..1 */
+  press: number;
+  task: number | null;
+  phase: 'enter' | 'travel' | 'work' | 'idle' | 'leave' | 'hidden';
+  idleFor: number;
+  seedPhase: number;
+  alpha: number;
+}
+
+export type Deco =
+  | { t: 'outline'; r: Rect; color: string }
+  | { t: 'badge'; x: number; y: number; text: string; color: string }
+  | { t: 'caret'; x: number; y: number; h: number; color: string }
+  | { t: 'guide'; x: number; color: string }
+  | { t: 'path'; pts: Pt[]; color: string }
+  | { t: 'ghost'; r: Rect; color: string }
+  | { t: 'media'; r: Rect };
+
+export interface Stage {
+  draw(cursors: Cursor[], decos: Deco[], showNames: boolean): void;
+  resize(): void;
+  destroy(): void;
+  el: HTMLCanvasElement;
+}

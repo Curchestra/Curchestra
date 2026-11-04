@@ -2,3 +2,5 @@
 export * from './host/host';
 export * from './reveal/reveal';
 export { scan } from './scanner/scan';
+export { cursorPath, getSprite } from './stage/sprites';
+export { createStage } from './stage/stage';
