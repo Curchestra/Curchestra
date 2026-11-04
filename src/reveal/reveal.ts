@@ -104,6 +104,20 @@ export function revealArea(root: Element, pieces: Element[]): void {
   }
 }
 
+/**
+ * R32: the build of `root` is over and no enclosing area is still building, so hiding is no longer
+ * needed: drop data-cu (and clips) from `root` and everything under it, except inside `keep`
+ * (inner areas still building).
+ */
+export function unmarkArea(root: Element, keep: Element[]): void {
+  const drop = (el: Element) => {
+    if (clipped.delete(el)) (el as HTMLElement).style.clipPath = '';
+    el.removeAttribute('data-cu');
+  };
+  drop(root);
+  for (const el of root.querySelectorAll('[data-cu]')) if (!keep.some((k) => k.contains(el))) drop(el);
+}
+
 export function revealAll(doc: Document): void {
   for (const el of clipped) (el as HTMLElement).style.clipPath = '';
   clipped.clear();

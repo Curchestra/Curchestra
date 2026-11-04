@@ -195,11 +195,15 @@ test("an 'idle' listener that adds an area keeps the loop going", async ({ page 
       added = true;
       eng.addArea(document.querySelector('#quote'), cfg, 'section');
     });
+    let quoteDone = false;
+    eng.on('section:done', (root: Element) => {
+      if (root.id === 'quote') quoteDone = true;
+    });
     eng.addArea(document.querySelector('#hero'), cfg, 'section');
-    for (let i = 0; i < 1200 && document.querySelector('#quote')!.getAttribute('data-cu') !== 'v'; i++) m.step(1);
-    return { added, quote: document.querySelector('#quote')!.getAttribute('data-cu'), hidden: document.querySelectorAll('[data-cu="h"]').length };
+    for (let i = 0; i < 1200 && !quoteDone; i++) m.step(1);
+    return { added, quoteDone, hidden: document.querySelectorAll('[data-cu="h"]').length };
   });
-  expect(r).toEqual({ added: true, quote: 'v', hidden: 0 });
+  expect(r).toEqual({ added: true, quoteDone: true, hidden: 0 });
 });
 
 test('pause and resume inside a listener leave exactly one rAF pending', async ({ page }) => {
@@ -340,6 +344,31 @@ test('addArea reads the viewport before it marks the area', async ({ page }) => 
   });
   expect(marked.length).toBeGreaterThan(0);
   expect(marked.every((m) => m === false)).toBe(true);
+});
+
+test('an inner area that ends inside a building one keeps its marks until the outer one ends (R32)', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const cu = (window as any).cu;
+    const m = (window as any).manualHost();
+    const cfg = cu.resolveConfig({ seed: 1, speed: 0.01 });
+    const eng = cu.createEngine(m.host, cfg);
+    const inner = eng.addArea(document.querySelector('#cards'), cfg, 'section');
+    const outer = eng.addArea(document.body, cfg, 'page');
+    inner.finish();
+    await inner.done;
+    const card = document.querySelector('.card')!;
+    const mid = { card: card.getAttribute('data-cu'), vis: getComputedStyle(card).visibility };
+    outer.finish();
+    await outer.done;
+    const end = {
+      attrs: document.querySelectorAll('[data-cu]').length,
+      styles: document.querySelectorAll('style[data-cu-style]').length,
+    };
+    eng.destroy();
+    return { mid, end };
+  });
+  expect(r.mid).toEqual({ card: 'v', vis: 'visible' });
+  expect(r.end).toEqual({ attrs: 0, styles: 0 });
 });
 
 test('cancel reveals without events; finish emits section:done', async ({ page }) => {

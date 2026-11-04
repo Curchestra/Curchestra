@@ -31,10 +31,8 @@ test.describe('api', () => {
     }
     expect(await page.evaluate(() => (window as any).finished)).toBe(true);
     expect(await hidden(page)).toBe(0);
-    const built = await page.evaluate(() =>
-      [...document.querySelectorAll('.v')].every((s) => s.getAttribute('data-cu') === 'v'),
-    );
-    expect(built).toBe(true);
+    // Every section was built and then cleaned up (R32).
+    expect(await page.evaluate(() => document.querySelectorAll('[data-cu]').length)).toBe(0);
   });
 
   test('page() default trigger: far sections are not hidden or scanned at start (R31)', async ({ page }) => {
@@ -63,6 +61,22 @@ test.describe('api', () => {
     await page.waitForTimeout(1200);
     await page.evaluate(() => document.querySelector('#s8')!.scrollIntoView());
     await page.waitForFunction(() => (window as any).tasksIn8 > 0, null, { timeout: 10_000 });
+  });
+
+  test('after the build the page is left as it was: no data-cu, no stylesheet, site CSS applies again (R32)', async ({ page }) => {
+    await open(page, 'spa.html');
+    const r = await page.evaluate(async () => {
+      const swarm = (window as any).curchestra({ seed: 1, speed: 12 });
+      await swarm.section('#view-a', { trigger: 'load' }).done;
+      const p = document.querySelector('#view-a p') as HTMLElement;
+      p.style.visibility = 'hidden';
+      return {
+        attrs: document.querySelectorAll('[data-cu]').length,
+        styles: document.querySelectorAll('style[data-cu-style]').length,
+        siteHides: getComputedStyle(p).visibility,
+      };
+    });
+    expect(r).toEqual({ attrs: 0, styles: 0, siteHides: 'hidden' });
   });
 
   test('inner scroll container: a section build completes', async ({ page }) => {
@@ -299,7 +313,7 @@ test.describe('script tag', () => {
     expect(await page.evaluate(() => typeof (window as any).Curchestra?.curchestra)).toBe('function');
     // Well under the 15 s failsafe, so this is the real build finishing.
     await page.waitForFunction(
-      () => document.querySelectorAll('[data-cu="h"]').length === 0 && document.querySelectorAll('[data-cu="v"]').length > 0,
+      () => document.querySelectorAll('[data-cu]').length === 0 && !document.querySelector('style[data-cu-style]'),
       null,
       { timeout: 10_000 },
     );

@@ -2,7 +2,7 @@ import { createAction } from '../actions/index';
 import { idleTarget } from '../idle/idle';
 import { clamp } from '../motion/ease';
 import { createRng } from '../motion/rng';
-import { applyOps, installStyles, revealAll, revealArea } from '../reveal/reveal';
+import { applyOps, installStyles, revealAll, revealArea, unmarkArea } from '../reveal/reveal';
 import { crewTarget } from '../scheduler/crew';
 import { createStage } from '../stage/stage';
 import type {
@@ -37,7 +37,8 @@ export function createEngine(host: Host, config: Config): Engine {
     config.theme === 'auto'
       ? win.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
       : config.theme;
-  const disposeStyles = installStyles(host);
+  /** The stylesheet is installed while any area is building (R32). */
+  let disposeStyles: (() => void) | null = null;
   const stage = createStage(host, config.zIndex, theme);
   const range = doc.createRange();
 
@@ -115,7 +116,13 @@ export function createEngine(host: Host, config: Config): Engine {
     areas.splice(areas.indexOf(a), 1);
     for (const k of crew) if (k.area === a && k.c.task !== null) freeCrew(k);
     for (let i = guides.length - 1; i >= 0; i--) if (guides[i].area === a) guides.splice(i, 1);
-    revealArea(a.root, a.pieces.map((p) => p.el));
+    // Inside a still-building area the marks keep this subtree visible; otherwise drop them (R32).
+    if (areas.some((o) => o.root.contains(a.root))) revealArea(a.root, a.pieces.map((p) => p.el));
+    else unmarkArea(a.root, areas.filter((o) => a.root.contains(o.root)).map((o) => o.root));
+    if (areas.length === 0 && disposeStyles) {
+      disposeStyles();
+      disposeStyles = null;
+    }
     a.resolve();
     if (events) emit('section:done', a.root);
     if (areas.length === 0 && hadAreas) {
@@ -490,6 +497,7 @@ export function createEngine(host: Host, config: Config): Engine {
         finish: () => endArea(area, true),
         cancel: () => endArea(area, false),
       };
+      disposeStyles ??= installStyles(host);
       areas.push(area);
       hadAreas = true;
       wake();
@@ -515,7 +523,8 @@ export function createEngine(host: Host, config: Config): Engine {
       halt();
       revealAll(doc);
       stage.destroy();
-      disposeStyles();
+      disposeStyles?.();
+      disposeStyles = null;
       win.removeEventListener('pointermove', onMove);
       win.removeEventListener('pointerdown', onDown);
       win.removeEventListener('keydown', onKeyDown, true);

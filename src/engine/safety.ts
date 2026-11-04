@@ -1,4 +1,4 @@
-import { revealArea } from '../reveal/reveal';
+import { unmarkArea } from '../reveal/reveal';
 import type { Config, Engine, Host, Mode, Run } from '../types';
 
 /** Log a recovered failure; callers then reveal everything. */
@@ -51,7 +51,7 @@ export function attachSafety(engine: Engine, host: Host, cfg: Config): () => voi
     } catch (err) {
       reportError(host, err);
       engine.finishAll();
-      revealArea(root, [...root.querySelectorAll('[data-cu]')]);
+      unmarkArea(root, []);
       return resolvedRun();
     }
     // A root inside an active area gets that area's Run (R17): it is already watched.
