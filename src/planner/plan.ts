@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 import type { Config, Piece, Task, TaskGraph, TaskType } from '../types';
 
 const REPEAT_TOLERANCE = 0.1;

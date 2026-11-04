@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 import type { Host, Rect, RevealOp } from '../types';
 
 const CSS = '[data-cu="h"]{visibility:hidden!important}[data-cu="v"]{visibility:visible!important}';

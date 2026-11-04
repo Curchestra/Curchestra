@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 import type { Host } from '../types';
 
 export function browserHost(win?: Window): Host | null {

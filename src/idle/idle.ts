@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 import type { Config, IdleCtx, Pt } from '../types';
 
 const TAU = Math.PI * 2;

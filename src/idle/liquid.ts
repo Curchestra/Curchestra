@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 import type { Crew } from '../engine/cursors';
 import { clamp } from '../motion/ease';
 import { type Personality, arcPoint, planArc } from '../motion/physics';

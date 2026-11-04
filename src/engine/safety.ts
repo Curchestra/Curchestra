@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 import { unmarkArea } from '../reveal/reveal';
 import type { Config, Engine, Host, Mode, Run } from '../types';
 

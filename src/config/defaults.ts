@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 import type { Config, DeepPartial } from '../types';
 
 export const DEFAULTS: Config = {

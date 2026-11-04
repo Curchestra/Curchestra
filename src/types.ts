@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 export type DeepPartial<T> = {
   [K in keyof T]?: T[K] extends (infer U)[]
     ? U[]

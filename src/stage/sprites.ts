@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 import type { CursorShape, Pt } from '../types';
 
 /** Shapes use a 24-unit grid drawn at SPRITE_PX. */

@@ -220,6 +220,6 @@ Numbers vary run to run and with the machine (three consecutive runs gave 8-20 m
 
 ## License
 
-MIT
+[MIT](LICENSE) © 2026 JoshLei
 
 Inspired by Swarm Rebuild and Joel Califa's Swarm.

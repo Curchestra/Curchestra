@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 import { clamp, easeInOutCubic, easeOutCubic } from '../motion/ease';
 import type { Config, Cursor, CursorShape, Deco, Fx, Piece, Pt, Rect, RevealOp, Task } from '../types';
 

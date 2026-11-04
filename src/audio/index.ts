@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 import { createRng } from '../motion/rng';
 import type { EnginePlugin, Fx, Pt } from '../types';
 

@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 import type { Action, ActionCtx } from '../actions/index';
 import { spring } from '../motion/ease';
 import { type Arc, type Personality, arcPoint, personality, planArc } from '../motion/physics';

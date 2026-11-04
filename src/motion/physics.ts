@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 import type { Pt } from '../types';
 import { clamp, easeOutCubic } from './ease';
 

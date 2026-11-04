@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 // Internals for the e2e pages; not exported by the package.
 export * from './host/host';
 export * from './reveal/reveal';

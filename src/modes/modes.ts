@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 import { resolveConfig, readDataAttrs } from '../config/resolve';
 import { validate } from '../config/validate';
 import { createEngine } from '../engine/engine';

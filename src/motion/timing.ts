@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 import { clamp } from './ease';
 
 /** Seconds to travel `distPx` at the given speed multiplier. */

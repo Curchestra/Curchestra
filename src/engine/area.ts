@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 import { completeTask, plan } from '../planner/plan';
 import { markArea } from '../reveal/reveal';
 import { scan } from '../scanner/scan';

@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 /** mulberry32 seeded PRNG; returns values in [0, 1). */
 export function createRng(seed: number): () => number {
   let a = seed >>> 0;

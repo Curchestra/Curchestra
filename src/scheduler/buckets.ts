@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 import type { Scheduler, TaskGraph } from '../types';
 
 /** px above the view that still count as on screen */

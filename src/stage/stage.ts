@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 import type { Cursor, Deco, Host, Pt, Rect, RulerState, Stage } from '../types';
 import { getSprite, hotOf, SPRITE_PX, SPRITE_SCALE } from './sprites';
 

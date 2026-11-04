@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 import { createAction } from '../actions/index';
 import { idlePlan } from '../idle/idle';
 import type { FlowAgent, FlowState } from '../idle/liquid';

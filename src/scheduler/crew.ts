@@ -1,3 +1,9 @@
+/*!
+ * curchestra
+ * Copyright(c) 2026 JoshLei
+ * MIT Licensed
+ */
+
 import { clamp } from '../motion/ease';
 
 /** Crew size: +1 per 50 px/s of scroll and per 3 pieces on screen. */
