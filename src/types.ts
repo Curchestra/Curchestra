@@ -105,3 +105,23 @@ export interface IdleCtx {
   /** per-cursor 0..1 */
   seedPhase: number;
 }
+
+export interface Host {
+  win: Window;
+  doc: Document;
+  now(): number;
+  raf(cb: (t: number) => void): number;
+  caf(id: number): void;
+  scroll(): Pt;
+  viewport(): { w: number; h: number };
+  dpr(): number;
+  reducedMotion(): boolean;
+  hidden(): boolean;
+}
+
+export type RevealOp =
+  | { op: 'hide'; el: Element }
+  | { op: 'show'; el: Element }
+  | { op: 'fade'; el: Element; ms: number }
+  | { op: 'clip'; el: Element; lines: Rect[]; progress: number; rtl: boolean }
+  | { op: 'unclip'; el: Element };

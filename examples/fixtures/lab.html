@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>lab</title></head>
+<body>
+  <div id="parent">
+    <p id="plain">Plain child</p>
+    <h2 id="piece" class="piece">Piece child</h2>
+  </div>
+  <button id="btn">Button</button>
+  <script type="module">
+    import * as cu from '/src/testing.ts';
+    window.cu = cu;
+    window.cuReady = true;
+  </script>
+</body>
+</html>
