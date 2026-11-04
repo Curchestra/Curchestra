@@ -194,7 +194,7 @@ export interface Engine {
     frameMs: number[];
     /** decos drawn in the last frame */
     decos: Deco[];
-    /** snapshot of the live crew (inspection only) */
+    /** @internal snapshot of the live crew, for tests and inspection only (R20) */
     cursors: Pick<Cursor, 'id' | 'name' | 'x' | 'y' | 'phase' | 'alpha'>[];
   };
 }

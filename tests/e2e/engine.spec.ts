@@ -140,12 +140,114 @@ test('same seed gives the same task sequence', async ({ page }) => {
 
 test('median frame time stays within 2 ms at 30 cursors', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'perf budget is measured in chromium');
-  await build(page, { agents: { min: 30, max: 30 } });
-  await page.waitForTimeout(1500);
-  const ms: number[] = await page.evaluate(() => (window as any).eng.stats().frameMs);
-  expect(ms.length).toBeGreaterThan(30);
-  const sorted = [...ms].sort((a, b) => a - b);
-  expect(sorted[sorted.length >> 1]).toBeLessThanOrEqual(2);
+  test.setTimeout(60_000);
+  await page.goto('/fixtures/big.html');
+  await page.waitForFunction(() => (window as any).cuReady === true);
+  const r = await page.evaluate(async () => {
+    const w = window as any;
+    const cu = w.cu;
+    const base = cu.browserHost();
+    let frames = 0;
+    const host = { ...base, raf: (cb: (t: number) => void) => base.raf((t: number) => (frames++, cb(t))) };
+    // big.html (maxTasks 1500 pieces) at speed 0.5 outlasts the 1-per-0.12 s spawn ramp to 30.
+    const cfg = cu.resolveConfig({ seed: 1, speed: 0.5, agents: { min: 30, max: 30 } });
+    const eng = cu.createEngine(host, cfg);
+    let finished = false;
+    eng.addArea(document.querySelector('#root'), cfg, 'section').done.then(() => (finished = true));
+    const live = () => eng.stats().cursors.filter((c: any) => c.phase !== 'leave').length;
+    const wait = (ms: number) => new Promise((res) => setTimeout(res, ms));
+    const t0 = performance.now();
+    while (live() < 30 && performance.now() - t0 < 15_000) await wait(50);
+    const rampMs = performance.now() - t0;
+    // ignore ramp-up frames: sample only once 120 frames have run at full crew
+    const start = frames;
+    while (frames - start < 130 && performance.now() - t0 < 30_000) await wait(50);
+    const ms: number[] = eng.stats().frameMs;
+    const out = { rampMs, sampled: frames - start, count: live(), finished, ms };
+    eng.destroy();
+    return out;
+  });
+  expect(r.count).toBe(30);
+  expect(r.finished).toBe(false);
+  expect(r.sampled).toBeGreaterThanOrEqual(120);
+  expect(r.ms.length).toBe(120);
+  const sorted = [...r.ms].sort((a, b) => a - b);
+  const median = sorted[sorted.length >> 1];
+  console.log(`perf: ramp ${Math.round(r.rampMs)} ms, median frame ${median.toFixed(3)} ms at ${r.count} cursors`);
+  expect(median).toBeLessThanOrEqual(2);
+});
+
+test("an 'idle' listener that adds an area keeps the loop going", async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const w = window as any;
+    const cu = w.cu;
+    const m = w.manualHost();
+    // no pointer + noPointer 'stay': idle cursors stand still, so nothing else keeps the loop alive after 'idle'
+    const cfg = cu.resolveConfig({ seed: 1, speed: 4, idle: { behavior: 'orbit', noPointer: 'stay' } });
+    const eng = cu.createEngine(m.host, cfg);
+    let added = false;
+    eng.on('idle', () => {
+      if (added) return;
+      added = true;
+      eng.addArea(document.querySelector('#quote'), cfg, 'section');
+    });
+    eng.addArea(document.querySelector('#hero'), cfg, 'section');
+    for (let i = 0; i < 1200 && document.querySelector('#quote')!.getAttribute('data-cu') !== 'v'; i++) m.step(1);
+    return { added, quote: document.querySelector('#quote')!.getAttribute('data-cu'), hidden: document.querySelectorAll('[data-cu="h"]').length };
+  });
+  expect(r).toEqual({ added: true, quote: 'v', hidden: 0 });
+});
+
+test('pause and resume inside a listener leave exactly one rAF pending', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const w = window as any;
+    const cu = w.cu;
+    const m = w.manualHost();
+    const cfg = cu.resolveConfig({ seed: 1, speed: 4 });
+    const eng = cu.createEngine(m.host, cfg);
+    let toggled = false;
+    eng.on('task', () => {
+      if (toggled) return;
+      toggled = true;
+      eng.pause();
+      eng.resume();
+    });
+    eng.addArea(document.querySelector('#hero'), cfg, 'section');
+    let maxPending = 0;
+    for (let i = 0; i < 300; i++) {
+      m.step(1);
+      maxPending = Math.max(maxPending, m.pending());
+    }
+    eng.destroy();
+    return { toggled, maxPending };
+  });
+  expect(r).toEqual({ toggled: true, maxPending: 1 });
+});
+
+test('the loop recovers after a frame throws', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const w = window as any;
+    const cu = w.cu;
+    const m = w.manualHost();
+    const cfg = cu.resolveConfig({ seed: 1, speed: 4 });
+    const eng = cu.createEngine(m.host, cfg);
+    let threw = 0;
+    eng.use({ onTask: () => { if (threw++ === 0) throw new Error('boom'); } });
+    eng.addArea(document.querySelector('#hero'), cfg, 'section');
+    let caught = false;
+    for (let i = 0; i < 300 && !caught; i++) {
+      try { m.step(1); } catch { caught = true; }
+    }
+    const pendingAfterThrow = m.pending();
+    window.dispatchEvent(new Event('scroll'));
+    const pendingAfterWake = m.pending();
+    m.step(600);
+    return { caught, pendingAfterThrow, pendingAfterWake, hidden: document.querySelectorAll('[data-cu="h"]').length };
+  });
+  expect(r.caught).toBe(true);
+  expect(r.pendingAfterThrow).toBe(0);
+  expect(r.pendingAfterWake).toBe(1);
+  expect(r.hidden).toBe(0);
 });
 
 test('hide: the loop stops after complete', async ({ page }) => {

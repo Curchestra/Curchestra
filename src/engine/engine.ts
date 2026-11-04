@@ -54,7 +54,6 @@ export function createEngine(host: Host, config: Config): Engine {
   let pointer: Pt | null = null;
   let lastTouch: Pt | null = null;
   let rafId = 0;
-  let running = false;
   let paused = false;
   let destroyed = false;
   let inFrame = false;
@@ -84,16 +83,16 @@ export function createEngine(host: Host, config: Config): Engine {
 
   // ---- loop control -------------------------------------------------------
 
-  function wake(): void {
-    if (running || paused || destroyed || host.hidden()) return;
-    running = true;
-    last = -1;
+  /** Schedule the next frame; at most one rAF is ever pending. */
+  function schedule(restart: boolean): void {
+    if (rafId || paused || destroyed || host.hidden()) return;
+    if (restart) last = -1;
     rafId = host.raf(frame);
   }
+  const wake = () => schedule(true);
   function halt(): void {
     if (rafId) host.caf(rafId);
     rafId = 0;
-    running = false;
   }
 
   // ---- areas --------------------------------------------------------------
@@ -183,15 +182,32 @@ export function createEngine(host: Host, config: Config): Engine {
 
   function frame(): void {
     rafId = 0;
-    if (destroyed || paused || host.hidden()) {
-      running = false;
-      return;
+    if (destroyed || paused || host.hidden()) return;
+    let more = false;
+    let ok = false;
+    try {
+      inFrame = true;
+      more = step();
+      ok = true;
+    } finally {
+      // Reset even if the body threw, so a later wake() can still schedule.
+      inFrame = false;
+      const events = queued.splice(0);
+      try {
+        if (ok) for (const [e, p] of events) fire(e, p);
+      } finally {
+        // Decided after listeners ran: they may have added areas, paused or destroyed.
+        if (more) schedule(false);
+      }
     }
+  }
+
+  /** One frame body; returns whether the loop should continue. */
+  function step(): boolean {
     const t0 = host.now();
     const dt = last < 0 ? 1 / 60 : clamp((t0 - last) / 1000, 0, MAX_DT);
     last = t0;
     time += dt;
-    inFrame = true;
 
     // 1. Read
     const sc = host.scroll();
@@ -370,14 +386,8 @@ export function createEngine(host: Host, config: Config): Engine {
       working = false;
       emit('idle');
     }
-    inFrame = false;
-    for (const [e, p] of queued.splice(0)) fire(e, p);
-    if (destroyed || paused) {
-      running = false;
-      return;
-    }
-    if (busy || active > 0 || inRange > 0) rafId = host.raf(frame);
-    else running = false;
+    // Queued events fire in frame() once this returns.
+    return busy || active > 0 || inRange > 0;
   }
 
   // ---- listeners ----------------------------------------------------------
