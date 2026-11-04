@@ -90,3 +90,18 @@ export interface Scheduler {
   /** queued tasks in bands overlapping [viewTop - margin, viewBot + margin] */
   inRange(viewTop: number, viewBot: number, margin: number): number;
 }
+
+export type Pt = { x: number; y: number };
+
+export interface IdleCtx {
+  pointer: Pt | null;
+  lastTouch: Pt | null;
+  /** where the cursor went idle */
+  home: Pt;
+  /** viewport coords */
+  areaRect: Rect;
+  viewport: { w: number; h: number };
+  time: number;
+  /** per-cursor 0..1 */
+  seedPhase: number;
+}
