@@ -16,13 +16,16 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./preload.css": "./dist/preload.css"
   },
   "files": [
     "dist"
   ],
   "scripts": {
     "build": "tsup",
+    "prebuild": "node scripts/dist.mjs clean",
+    "postbuild": "node scripts/dist.mjs css",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test"

@@ -31,6 +31,14 @@ describe('config', () => {
     expect(warn).toHaveBeenCalledTimes(3);
     expect(warn.mock.calls[1][0]).toBe('[curchestra] idle.behavior: must be one of orbit|flock|wander|leave|hide; using orbit');
   });
+  test('validate drops skip entries that are not selectors', () => {
+    const warn = vi.fn();
+    const ok = (s: string) => !s.includes('[[');
+    const out = validate({ skip: ['.a', 'b[[', '#c'] }, warn, ok);
+    expect(out).toEqual({ skip: ['.a', '#c'] });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain('b[[');
+  });
   test('agents.min > max is clamped', () => {
     expect(resolveConfig({ agents: { min: 40, max: 10 } }).agents).toMatchObject({ min: 10, max: 10 });
   });

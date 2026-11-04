@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>inner scroll</title>
+<style>
+  body { margin: 0; font: 16px/1.5 sans-serif; color: #222; }
+  h1 { margin: 16px 24px; }
+  #panel { height: 300px; width: 520px; margin: 0 24px; overflow: auto; border: 2px solid #3949ab; box-sizing: border-box; }
+  #panel .row { background: #e8eaf6; margin: 12px; padding: 12px; height: 60px; box-sizing: border-box; }
+</style>
+</head>
+<body>
+  <h1>Inner scroller</h1>
+  <div id="panel">
+    <div class="row"><p>Row one of the panel.</p></div>
+    <div class="row"><p>Row two of the panel.</p></div>
+    <div class="row"><p>Row three of the panel.</p></div>
+    <div class="row"><p>Row four of the panel.</p></div>
+    <div class="row"><p>Row five of the panel.</p></div>
+    <div class="row"><p>Row six of the panel.</p></div>
+    <div class="row"><p>Row seven of the panel.</p></div>
+    <div class="row"><p>Row eight of the panel.</p></div>
+    <div class="row"><p>Row nine of the panel.</p></div>
+    <div class="row"><p>Row ten of the panel.</p></div>
+  </div>
+  <script type="module">
+    import { curchestra } from '/src/index.ts';
+    window.curchestra = curchestra;
+    window.cuReady = true;
+  </script>
+</body>
+</html>

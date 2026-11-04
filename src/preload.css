@@ -1,0 +1,10 @@
+html:not(.cu-ready) [data-cu-section],
+html:not(.cu-ready) body.cu-intro > * {
+  visibility: hidden;
+  animation: cu-failsafe 0s var(--cu-failsafe, 15s) forwards;
+}
+@keyframes cu-failsafe {
+  to {
+    visibility: visible;
+  }
+}

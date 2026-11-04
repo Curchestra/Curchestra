@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>spa</title>
+<style>
+  body { margin: 0; font: 16px/1.5 sans-serif; color: #222; }
+  #app { padding: 24px; min-height: 300px; }
+  .card { background: #c5cae9; padding: 16px; margin: 12px 0; width: 360px; }
+</style>
+</head>
+<body>
+  <button id="go" type="button">Next view</button>
+  <div id="app">
+    <section id="view-a"><h1>View A</h1><div class="card"><p>The first view.</p></div></section>
+  </div>
+  <script>
+    window.swapCount = 0;
+    window.swap = function () {
+      window.swapCount++;
+      document.getElementById('app').innerHTML =
+        '<section id="view-b"><h1>View B</h1><div class="card"><p>The second view.</p></div>' +
+        '<div class="card"><p>With another card.</p></div></section>';
+    };
+  </script>
+  <script type="module">
+    import { curchestra } from '/src/index.ts';
+    window.curchestra = curchestra;
+    window.cuReady = true;
+  </script>
+</body>
+</html>

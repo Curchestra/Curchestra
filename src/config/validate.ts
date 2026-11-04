@@ -85,10 +85,14 @@ function check(rule: Rule, v: unknown): string | null {
   }
 }
 
-/** Drop unknown keys and invalid values, calling `warn` once per problem. */
+/**
+ * Drop unknown keys and invalid values, calling `warn` once per problem.
+ * With `isSelector`, `skip` entries it rejects are dropped with a warning.
+ */
 export function validate(
   input: unknown,
   warn: (msg: string) => void = (m) => console.warn(m),
+  isSelector?: (selector: string) => boolean,
 ): DeepPartial<Config> {
   const walk = (obj: unknown, shape: Record<string, Rule>, prefix: string): Record<string, unknown> => {
     const out: Record<string, unknown> = {};
@@ -114,6 +118,14 @@ export function validate(
       if (problem) {
         const fb = lookup(path);
         warn(`[curchestra] ${path}: ${problem}; using ${fb === undefined ? 'none' : show(fb)}`);
+        continue;
+      }
+      if (path === 'skip' && isSelector) {
+        out[key] = (v as string[]).filter((sel) => {
+          const ok = isSelector(sel);
+          if (!ok) warn(`[curchestra] skip: ${show(sel)} is not a valid selector; dropped`);
+          return ok;
+        });
         continue;
       }
       out[key] = v;
