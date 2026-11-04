@@ -79,3 +79,23 @@ test('installStyles is refcounted', async ({ page }) => {
   expect(r.afterFirst).toBe(1);
   expect(r.afterSecond).toBe(0);
 });
+
+test('revealArea shows root and pieces and clears their clips', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const cu = (window as any).cu;
+    cu.installStyles(cu.browserHost());
+    const parent = document.querySelector('#parent')!;
+    const piece = document.querySelector('#piece') as HTMLElement;
+    cu.markArea(parent, [piece]);
+    cu.applyOps([{ op: 'clip', el: piece, lines: [{ x: 0, y: 0, w: 10, h: 10 }], progress: 0.5, rtl: false, elRect: { x: 0, y: 0, w: 10, h: 10 } }]);
+    const clippedBefore = piece.style.clipPath !== '';
+    cu.revealArea(parent, [piece]);
+    return {
+      clippedBefore,
+      clip: piece.style.clipPath,
+      root: parent.getAttribute('data-cu'),
+      piece: piece.getAttribute('data-cu'),
+    };
+  });
+  expect(r).toEqual({ clippedBefore: true, clip: '', root: 'v', piece: 'v' });
+});

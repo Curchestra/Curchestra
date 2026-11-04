@@ -96,6 +96,14 @@ export function applyOps(ops: RevealOp[]): void {
   }
 }
 
+/** Area done: show the root and every piece, and clear clips this module set on them. */
+export function revealArea(root: Element, pieces: Element[]): void {
+  for (const el of [root, ...pieces]) {
+    el.setAttribute('data-cu', 'v');
+    if (clipped.delete(el)) (el as HTMLElement).style.clipPath = '';
+  }
+}
+
 export function revealAll(doc: Document): void {
   for (const el of clipped) (el as HTMLElement).style.clipPath = '';
   clipped.clear();

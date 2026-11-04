@@ -4,3 +4,5 @@ export * from './reveal/reveal';
 export { scan } from './scanner/scan';
 export { cursorPath, getSprite } from './stage/sprites';
 export { createStage } from './stage/stage';
+export { createEngine } from './engine/engine';
+export { resolveConfig } from './config/resolve';

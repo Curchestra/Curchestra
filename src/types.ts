@@ -162,3 +162,39 @@ export interface Stage {
   destroy(): void;
   el: HTMLCanvasElement;
 }
+
+export interface Run {
+  done: Promise<void>;
+  /** reveal the area now, resolve `done`, emit 'section:done' */
+  finish(): void;
+  /** reveal the area now and resolve `done`, without events */
+  cancel(): void;
+}
+
+export type EngineEvent = 'complete' | 'section:done' | 'idle' | 'task';
+
+export interface EnginePlugin {
+  onTask?(type: TaskType, xNorm: number): void;
+  onKey?(xNorm: number): void;
+  onComplete?(): void;
+  destroy?(): void;
+}
+
+export interface Engine {
+  addArea(root: Element, cfg: Config, mode: Mode): Run;
+  areaFor(el: Element): Run | null;
+  pause(): void;
+  resume(): void;
+  finishAll(): void;
+  destroy(): void;
+  on(e: EngineEvent, fn: (payload?: unknown) => void): () => void;
+  use(plugin: EnginePlugin): void;
+  stats(): {
+    /** last 120 frame script times, ms */
+    frameMs: number[];
+    /** decos drawn in the last frame */
+    decos: Deco[];
+    /** snapshot of the live crew (inspection only) */
+    cursors: Pick<Cursor, 'id' | 'name' | 'x' | 'y' | 'phase' | 'alpha'>[];
+  };
+}
