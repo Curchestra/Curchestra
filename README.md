@@ -19,10 +19,12 @@ import { curchestra } from 'curchestra';
 
 const swarm = curchestra({ preset: 'calm' }); // one instance per page
 
-// 1. Page: builds everything in the body (or every [data-cu-section]).
+// 1. Page: builds each top-level section of the body (or every [data-cu-section])
+//    as it approaches the viewport.
 swarm.page();
 
-// 2. Section: builds one element when it scrolls into view.
+// 2. Section: builds one element when it scrolls into view. Its cursors enter and
+//    leave through the section's own edges.
 swarm.section('#pricing', { idle: { behavior: 'leave' } });
 
 // 3. Transition: runs your update, then builds the new content.
@@ -63,7 +65,7 @@ Every key is optional and fully typed.
 | `agents.colors` | built-in | Cursor colors. |
 | `agents.showNames` | `true` | Show name labels. |
 | `speed` | `1` | Speed multiplier. |
-| `trigger` | page `'load'`, section `'in-view'` | When an area starts: `'load'`, `'in-view'` or `'manual'`. |
+| `trigger` | page `'load'`, section `'in-view'` | When an area starts: `'load'`, `'in-view'` or `'manual'`. In `page()`, `'load'` starts the sections near the viewport at once and each other section as it approaches (within one viewport); nothing off-screen is hidden or scanned up front. For `section()`, `'load'` starts immediately. |
 | `persist` | `true` | Keep idle cursors on the page (per `idle.behavior`) when no work is in range; `false` makes them leave instead. |
 | `idle.behavior` | `'orbit'` | What cursors do with no work: `orbit`, `flock`, `wander`, `leave`, `hide`. |
 | `idle.after` | `1.5` | Seconds without a ready task before a cursor goes idle. |
@@ -77,7 +79,7 @@ Every key is optional and fully typed.
 | `skip` | `[]` | Selectors that are never hidden or animated. |
 | `seed` | random | Fixed seed for a repeatable swarm. |
 | `maxTasks` | `1500` | Cap on animated pieces per build. |
-| `failsafe` | `15000` | Milliseconds after which everything is revealed no matter what. |
+| `failsafe` | `15000` | Milliseconds after an area starts after which that area is revealed no matter what. Each area has its own timer, so a section reached late still gets its build. |
 | `zIndex` | `2147483000` | Stacking order of the cursor canvas. |
 
 Merge order, later wins: built-in defaults, preset, `curchestra(config)`, per-call options, `data-cu-*` attributes on the target element. In development builds, unknown keys and invalid values print one `console.warn` naming the key and the value used instead.
@@ -137,13 +139,14 @@ Note: the rule's `animation` shorthand overrides any author `animation` on those
 - Click or focus to skip: a click, tap or focus inside an unbuilt area finishes that area instantly.
 - Keyboard: pressing Tab or Shift+Tab while any area is unbuilt finishes the build instantly, before focus moves, so the next focus target is visible and focusable.
 - The cursor canvas is `aria-hidden`; the real content stays in the HTML.
-- Hiding only lasts for the duration of a build, and a failsafe reveals everything on any error.
+- Hiding only lasts for the duration of a build. When an area finishes (and no enclosing area is still building), its `data-cu` attributes are removed, so your own CSS applies again; the injected stylesheet is removed once no area is building. A failsafe reveals everything on any error.
 
 ## Limitations
 
 - Elements added to an area while it is still building are not given their own cursor animation. They appear together with their nearest hidden ancestor (or with the area, at its end).
 - The ESM build expects a bundler. Script-tag users should use the IIFE (`dist/curchestra.js`).
-- `seed`, `theme`, `zIndex` and `agents.showNames` are instance-level: set them in `curchestra(config)`. Per call or per attribute they are ignored (with a development warning).
+- `seed`, `theme`, `zIndex`, `agents.showNames`, `skipOnClick` and `sound` are instance-level: set them in `curchestra(config)`. Per call or per attribute they are ignored (with a development warning).
+- Cursors of a `section()` build are confined to it: they spawn just outside the section's nearest edge and leave through it, fading in and out there. `page()` and `transition()` cursors enter and leave at the viewport edges.
 - Crew bounds (`agents.min` / `agents.max`) are the maximum across all active areas' resolved configs, since one shared crew serves every area.
 - Server-side rendering is safe (importing has no side effects, every call is a no-op without a DOM), but there is nothing to animate there.
 
@@ -155,18 +158,18 @@ Performance rows come from [`bench/results.md`](bench/results.md): one 8 s run p
 |---|---|---|
 | Where it runs | Your own browser (extension) | Any website (npm or script tag) |
 | Scope | Whole page only | Whole page, one section, or a transition |
-| Start-up | Copies the page; scrolls through all of it first. Time to first cursor move: 1,661 ms (landing), 1,843 ms (long), 3,180 ms (big) | Measures only what's near the screen, as it's reached. Time to first move: 16 ms (landing), 22 ms (long), 80 ms (big, not gated) |
-| Per frame | Script time per frame: 0.89 ms (landing), 0.61 ms (long), 1.18 ms (big) | 0.55 ms (landing), 0.58 ms (long), 0.76 ms (big) |
-| Memory | Peak heap 6.0 / 5.8 / 29.3 MB | Peak heap 4.6 / 4.6 / 4.9 MB |
-| Long tasks (> 50 ms) | 1 / 1 / 2 (worst 828 ms on big) | 0 / 0 / 0 |
+| Start-up | Copies the page; scrolls through all of it first. Time to first cursor move: 1,596 ms (landing), 1,779 ms (long), 2,825 ms (big) | Measures only what's near the screen, as it's reached. Time to first move: 13 ms (landing), 18 ms (long), 45 ms (big, not gated) |
+| Per frame | Script time per frame: 0.64 ms (landing), 0.41 ms (long), 0.77 ms (big) | 0.36 ms (landing), 0.35 ms (long), 0.51 ms (big) |
+| Memory | Peak heap 6.0 / 5.9 / 28.9 MB | Peak heap 3.8 / 3.2 / 4.9 MB |
+| Long tasks (> 50 ms) | 1 / 1 / 2 (worst 511 ms on big) | 0 / 0 / 0 |
 | Page during animation | Covered by a copy | The real page: clickable and readable by search engines |
 | Configuration | None (hard-coded) | Presets, typed options, HTML attributes |
 | Idle | Flocks to the mouse when finished | orbit / flock / wander / leave / hide, plus 3 no-pointer options |
 | Failure handling | Can leave the page half-built | Failsafe always reveals everything |
 | Accessibility | None | Respects reduced motion; click/focus/Tab skips |
-| Size | Single file of about 3,800 lines (line count of the original `swarm.js`) | 14.2 KB gzipped core as measured by size-limit (budget 15 KB); sound only if enabled |
+| Size | Single file of about 3,800 lines (line count of the original `swarm.js`) | 14.49 KB gzipped core as measured by size-limit (budget 15 KB); sound only if enabled |
 
-Numbers vary run to run and with the machine (three consecutive runs gave 11-22 ms first move on landing and long, 73-80 ms on big). The "big" fixture is a stress page of 20,000 elements (1,500 is only the default `maxTasks` cap); it is reported but excluded from the 50 ms first-move gate, while the script-time and long-task gates apply to every fixture. In one of three runs Curchestra had a single 52 ms long task on big, just over the 50 ms budget. See `bench/results.md` and re-run `npm run bench`.
+Numbers vary run to run and with the machine (three consecutive runs gave 8-20 ms first move on landing and long, 41-46 ms on big, and no long task on any fixture). The "big" fixture is a stress page of 20,000 elements (1,500 is only the default `maxTasks` cap); it is reported but excluded from the 50 ms first-move gate, while the script-time and long-task gates apply to every fixture. `page()` is called from a script tag in the benchmark, so the browser attributes any long task to it. See `bench/results.md` and re-run `npm run bench`.
 
 ## Development
 
