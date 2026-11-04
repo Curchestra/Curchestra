@@ -72,7 +72,7 @@ test('skipOnClick:false ignores clicks', async ({ page }) => {
   expect(await page.evaluate(() => (window as any).finishedBy['#cards'])).toBeUndefined();
 });
 
-test('focusing a link inside an unbuilt area finishes it', async ({ page }) => {
+test('focusin on an already revealed link inside an unbuilt area finishes it (programmatic focus)', async ({ page }) => {
   await build(page, { seed: 1, speed: 0.3, failsafe: 60_000 });
   await page.waitForFunction(() => !!document.querySelector('#nav a[data-cu="v"]'), null, { timeout: 15_000 });
   expect(await page.evaluate(() => (window as any).finishedBy['body'])).toBeUndefined();
@@ -80,6 +80,46 @@ test('focusing a link inside an unbuilt area finishes it', async ({ page }) => {
   await page.evaluate(() => (document.querySelector('#nav a[data-cu="v"]') as HTMLElement).focus());
   await page.waitForFunction(() => (window as any).finishedBy['body'] !== undefined, null, { timeout: 500 });
   expect(await hidden(page)).toBe(0);
+});
+
+test('Tab into an unbuilt area reveals it first and lands on its link', async ({ page, browserName }) => {
+  test.skip(browserName === 'webkit', 'WebKit does not Tab to links by default');
+  await build(page, { ...SLOW, failsafe: 60_000 }, ['#nav', '#cards']);
+  await page.evaluate(() => {
+    const b = document.createElement('button');
+    b.id = 'before';
+    b.textContent = 'before';
+    document.body.prepend(b);
+    b.focus();
+  });
+  expect(await hidden(page)).toBeGreaterThan(0);
+  await page.keyboard.press('Tab');
+  await page.waitForFunction(() => Object.keys((window as any).finishedBy).length === 2, null, { timeout: 500 });
+  expect(await hidden(page)).toBe(0);
+  const active = await page.evaluate(() => document.activeElement?.closest('#nav') !== null && document.activeElement?.localName === 'a');
+  expect(active).toBe(true);
+});
+
+test('cancelled area does not leave a stale failsafe for the next area', async ({ page }) => {
+  await build(page, { ...SLOW, failsafe: 400 }, ['#hero']);
+  await page.waitForTimeout(200);
+  await page.evaluate(() => {
+    const w = window as any;
+    w.runs['#hero'].cancel();
+    w.cfg2 = w.cu.resolveConfig({ seed: 1, speed: 0.01, failsafe: 400 });
+  });
+  await page.waitForTimeout(50);
+  await page.evaluate(() => {
+    const w = window as any;
+    w.t2 = performance.now();
+    w.run2 = w.eng.addArea(document.querySelector('#cards'), w.cfg2, 'section');
+    w.run2.done.then(() => (w.end2 = performance.now()));
+  });
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => (window as any).end2)).toBeUndefined();
+  await page.waitForFunction(() => (window as any).end2 !== undefined, null, { timeout: 1000 });
+  const dur = await page.evaluate(() => (window as any).end2 - (window as any).t2);
+  expect(dur).toBeGreaterThanOrEqual(390);
 });
 
 test('elements appended mid-build are visible at complete', async ({ page }) => {

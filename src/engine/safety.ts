@@ -18,6 +18,7 @@ export function attachSafety(engine: Engine, host: Host, cfg: Config): () => voi
   const doc = host.doc;
   const original = engine.addArea.bind(engine);
   const observers = new Set<MutationObserver>();
+  const active = new Set<Run>();
   let timer = 0;
   let off = false;
 
@@ -33,9 +34,13 @@ export function attachSafety(engine: Engine, host: Host, cfg: Config): () => voi
     });
     mo.observe(root, { childList: true, subtree: true });
     observers.add(mo);
+    active.add(run);
     const stop = () => {
       mo.disconnect();
       observers.delete(mo);
+      active.delete(run);
+      // However the last area ended (finish, cancel, failsafe), disarm the timer.
+      if (active.size === 0) clearTimer();
     };
     run.done.then(stop, stop);
   }
@@ -86,7 +91,12 @@ export function attachSafety(engine: Engine, host: Host, cfg: Config): () => voi
   const onFocus = (e: Event) => {
     runAt(e.target, null, null)?.finish();
   };
+  // Hidden content cannot take focus, so Tab would skip it: reveal before the browser moves focus.
+  const onKey = (e: Event) => {
+    if ((e as KeyboardEvent).key === 'Tab' && active.size > 0) engine.finishAll();
+  };
   if (cfg.skipOnClick) {
+    doc.addEventListener('keydown', onKey, true);
     doc.addEventListener('pointerdown', onDown, true);
     doc.addEventListener('focusin', onFocus, true);
   }
@@ -99,5 +109,6 @@ export function attachSafety(engine: Engine, host: Host, cfg: Config): () => voi
     observers.clear();
     doc.removeEventListener('pointerdown', onDown, true);
     doc.removeEventListener('focusin', onFocus, true);
+    doc.removeEventListener('keydown', onKey, true);
   };
 }
