@@ -306,6 +306,23 @@ test.describe('fix round 1', () => {
   });
 });
 
+test.describe('instance-level keys', () => {
+  for (const [key, opts] of [
+    ['skipOnClick', { skipOnClick: false }],
+    ['sound', { sound: { volume: 0.2 } }],
+  ] as const) {
+    test(`${key} per call warns in dev that it only applies to curchestra(config)`, async ({ page }) => {
+      await open(page, 'spa.html');
+      const warnings: string[] = [];
+      page.on('console', (m) => m.type() === 'warning' && warnings.push(m.text()));
+      await page.evaluate((o) => {
+        (window as any).curchestra({ seed: 1 }).section('#view-a', { ...o, trigger: 'manual' });
+      }, opts);
+      await expect.poll(() => warnings.filter((w) => w.includes(key)).length).toBe(1);
+    });
+  }
+});
+
 test.describe('script tag', () => {
   test('the IIFE build reads data-curchestra, adds cu-ready and builds the page', async ({ page }) => {
     await page.goto('/fixtures/script-tag.html');

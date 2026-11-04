@@ -111,10 +111,13 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
   const markReady = () => doc.documentElement.classList.add('cu-ready');
 
   let warnedInstance = false;
-  /** seed, theme, zIndex and agents.showNames belong to the shared canvas and RNG (R27). */
+  /**
+   * seed, theme, zIndex and agents.showNames belong to the shared canvas and RNG (R27); skipOnClick
+   * and sound are wired once per instance (safety listeners, the audio plugin).
+   */
   function warnInstanceLevel(layer: DeepPartial<Config>): void {
     if (process.env.NODE_ENV === 'production' || warnedInstance) return;
-    const hit = ['seed', 'theme', 'zIndex'].find((k) => k in layer) ?? (layer.agents && 'showNames' in layer.agents ? 'agents.showNames' : '');
+    const hit = ['seed', 'theme', 'zIndex', 'skipOnClick', 'sound'].find((k) => k in layer) ?? (layer.agents && 'showNames' in layer.agents ? 'agents.showNames' : '');
     if (!hit) return;
     warnedInstance = true;
     console.warn(`[curchestra] ${hit}: only applies to curchestra(config); ignored for this call`);
