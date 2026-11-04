@@ -231,8 +231,7 @@ test('a frame that throws is recovered: area revealed, loop usable again (T11)',
     const m = w.manualHost();
     const cfg = cu.resolveConfig({ seed: 1, speed: 4 });
     const eng = cu.createEngine(m.host, cfg);
-    let threw = 0;
-    eng.use({ onTask: () => { if (threw++ === 0) throw new Error('boom'); } });
+    eng.__failNextFrame();
     eng.addArea(document.querySelector('#hero'), cfg, 'section');
     let caught = false;
     try { m.step(300); } catch { caught = true; }
@@ -362,4 +361,30 @@ test('task events carry the element; guides carry null', async ({ page }) => {
   expect(r.some((s) => s.type === 'guide' && !s.el)).toBe(true);
   expect(r.filter((s) => s.type === 'text').length).toBe(4);
   expect(r.every((s) => s.type === 'guide' || s.el)).toBe(true);
+});
+
+test('a throwing plugin is logged and does not break the frame (T13)', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const w = window as any;
+    const cu = w.cu;
+    const m = w.manualHost();
+    const cfg = cu.resolveConfig({ seed: 1, speed: 4 });
+    const eng = cu.createEngine(m.host, cfg);
+    const logged: unknown[][] = [];
+    const orig = console.error;
+    console.error = (...a: unknown[]) => void logged.push(a);
+    let unlocked = 0;
+    eng.use({ onTask() { throw new Error('boom'); }, onKey() { throw new Error('boom'); }, unlock: () => void unlocked++ });
+    eng.addArea(document.querySelector('#hero'), cfg, 'section');
+    m.step(600);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b' }));
+    eng.use({ unlock: () => void unlocked++ });
+    console.error = orig;
+    return { logged: logged.length, tag: logged[0]?.[0], unlocked, hidden: document.querySelectorAll('[data-cu="h"]').length };
+  });
+  expect(r.logged).toBeGreaterThan(0);
+  expect(r.tag).toBe('[curchestra]');
+  expect(r.unlocked).toBe(2);
+  expect(r.hidden).toBe(0);
 });

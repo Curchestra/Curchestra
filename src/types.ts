@@ -177,6 +177,8 @@ export interface EnginePlugin {
   onTask?(type: TaskType, xNorm: number): void;
   onKey?(xNorm: number): void;
   onComplete?(): void;
+  /** Called on the first pointerdown/keydown (a user gesture), or at once if that already happened. */
+  unlock?(): void;
   destroy?(): void;
 }
 

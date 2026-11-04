@@ -57,6 +57,7 @@ export function createEngine(host: Host, config: Config): Engine {
   let rafId = 0;
   let paused = false;
   let destroyed = false;
+  let unlocked = false;
   let inFrame = false;
   let last = -1;
   let time = 0;
@@ -120,7 +121,7 @@ export function createEngine(host: Host, config: Config): Engine {
     if (areas.length === 0 && hadAreas) {
       hadAreas = false;
       if (events) {
-        for (const p of plugins) p.onComplete?.();
+        callPlugins((p) => p.onComplete?.());
         emit('complete');
       }
     }
@@ -326,7 +327,7 @@ export function createEngine(host: Host, config: Config): Engine {
           if (Math.hypot(tx - c.x, ty - c.y) < ARRIVE_PX) {
             c.phase = 'work';
             arrived = true;
-            for (const p of plugins) p.onTask?.(task.type, c.x / vp.w);
+            callPlugins((p) => p.onTask?.(task.type, xNorm(c.x, vp.w)));
           }
         }
         if (c.phase === 'work') {
@@ -337,7 +338,7 @@ export function createEngine(host: Host, config: Config): Engine {
           if (ks && plugins.length) {
             while (k.key < ks.length && ks[k.key] <= k.t) {
               k.key++;
-              for (const p of plugins) p.onKey?.(c.x / vp.w);
+              callPlugins((p) => p.onKey?.(xNorm(c.x, vp.w)));
             }
           }
           syncSprings(c, dt);
@@ -432,7 +433,26 @@ export function createEngine(host: Host, config: Config): Engine {
     pointer = { x: e.clientX, y: e.clientY };
     wake();
   };
+  /** Run `fn` on every plugin; a throwing plugin must never break the frame. */
+  function callPlugins(fn: (p: EnginePlugin) => void): void {
+    for (const p of plugins) {
+      try {
+        fn(p);
+      } catch (err) {
+        console.error('[curchestra]', err);
+      }
+    }
+  }
+  const xNorm = (x: number, w: number) => (w > 0 ? Math.min(1, Math.max(0, x / w)) : 0);
+  /** The first user gesture unlocks plugins that need one (audio contexts). */
+  const unlock = () => {
+    if (unlocked) return;
+    unlocked = true;
+    callPlugins((p) => p.unlock?.());
+  };
+  const onKeyDown = () => unlock();
   const onDown = (e: PointerEvent) => {
+    unlock();
     if (e.pointerType === 'touch') lastTouch = { x: e.clientX, y: e.clientY };
     wake();
   };
@@ -448,6 +468,7 @@ export function createEngine(host: Host, config: Config): Engine {
   const onVis = () => wake();
   win.addEventListener('pointermove', onMove);
   win.addEventListener('pointerdown', onDown);
+  win.addEventListener('keydown', onKeyDown, true);
   doc.documentElement.addEventListener('pointerleave', onLeave);
   win.addEventListener('scroll', onScroll, { passive: true });
   win.addEventListener('resize', onResize);
@@ -497,11 +518,12 @@ export function createEngine(host: Host, config: Config): Engine {
       disposeStyles();
       win.removeEventListener('pointermove', onMove);
       win.removeEventListener('pointerdown', onDown);
+      win.removeEventListener('keydown', onKeyDown, true);
       doc.documentElement.removeEventListener('pointerleave', onLeave);
       win.removeEventListener('scroll', onScroll);
       win.removeEventListener('resize', onResize);
       doc.removeEventListener('visibilitychange', onVis);
-      for (const p of plugins) p.destroy?.();
+      callPlugins((p) => p.destroy?.());
       plugins.length = 0;
       crew.length = 0;
       cursors = [];
@@ -517,6 +539,7 @@ export function createEngine(host: Host, config: Config): Engine {
     },
     use(plugin) {
       plugins.push(plugin);
+      if (unlocked) callPlugins((p) => (p === plugin ? p.unlock?.() : undefined));
     },
     __failNextFrame() {
       failNext = true;

@@ -3,7 +3,7 @@ import { defineConfig } from 'tsup';
 // dist/ is emptied by the `prebuild` script; tsup builds run in parallel so neither clears it.
 export default defineConfig([
   {
-    entry: ['src/index.ts'],
+    entry: { index: 'src/index.ts', 'audio/index': 'src/audio/index.ts' },
     format: ['esm'],
     dts: true,
     splitting: true,

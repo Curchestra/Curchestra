@@ -92,7 +92,17 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
 
   function getEngine(): Engine {
     if (!engine) {
-      engine = createEngine(host!, resolveConfig(globalCfg()));
+      const cfg = resolveConfig(globalCfg());
+      const eng = (engine = createEngine(host!, cfg));
+      // Sound is an optional chunk: it is only fetched when the site asks for it.
+      if (cfg.sound) {
+        const sound = cfg.sound;
+        import('../audio/index')
+          .then((m) => {
+            if (engine === eng) eng.use(m.createAudio(sound));
+          })
+          .catch((err) => console.error('[curchestra]', err));
+      }
       for (const s of subs) s.off = engine.on(s.e, s.fn);
     }
     return engine;

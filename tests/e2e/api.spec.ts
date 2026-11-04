@@ -280,4 +280,59 @@ test.describe('script tag', () => {
       expect(await page.evaluate(() => document.querySelectorAll('[data-cu]').length)).toBe(0);
     });
   }
+
+  test.describe('sound', () => {
+    const audioRequests = (page: Page) => {
+      const urls: string[] = [];
+      page.on('request', (r) => {
+        if (/\/src\/audio\/index/.test(r.url())) urls.push(r.url());
+      });
+      return urls;
+    };
+
+    test('sound: false never requests the audio chunk', async ({ page }) => {
+      const urls = audioRequests(page);
+      await open(page, 'long.html');
+      await page.evaluate(() => {
+        const w = window as any;
+        w.run = w.curchestra({ seed: 1, speed: 8, sound: false }).page();
+      });
+      await page.waitForTimeout(500);
+      expect(urls).toEqual([]);
+    });
+
+    test('a first click creates exactly one AudioContext and the build completes', async ({ page }) => {
+      const errors: string[] = [];
+      page.on('pageerror', (e) => errors.push(String(e)));
+      await open(page, 'long.html');
+      await page.evaluate(() => {
+        const w = window as any;
+        w.ctxs = 0;
+        const Orig = w.AudioContext ?? w.webkitAudioContext;
+        const Counted = function (this: unknown, ...args: unknown[]) {
+          w.ctxs++;
+          return new Orig(...args);
+        } as unknown;
+        w.AudioContext = Counted;
+        w.finished = false;
+        w.run = w.curchestra({ seed: 1, speed: 8, sound: { volume: 0.4 } }).page();
+        w.run.done.then(() => (w.finished = true));
+      });
+      await page.mouse.click(50, 50);
+      await expect.poll(() => page.evaluate(() => (window as any).ctxs), { timeout: 5000 }).toBe(1);
+      await page.evaluate(() => (window as any).run.finish());
+      await page.waitForFunction(() => (window as any).finished === true);
+      expect(errors).toEqual([]);
+    });
+
+    test('sound: { volume } loads the audio chunk', async ({ page }) => {
+      const urls = audioRequests(page);
+      await open(page, 'long.html');
+      await page.evaluate(() => {
+        const w = window as any;
+        w.run = w.curchestra({ seed: 1, speed: 8, sound: { volume: 0.4 } }).page();
+      });
+      await expect.poll(() => urls.length, { timeout: 5000 }).toBeGreaterThan(0);
+    });
+  });
 });
