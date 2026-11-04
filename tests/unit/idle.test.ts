@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { idleTarget } from '../../src/idle/idle';
-import type { IdleCtx, Pt } from '../../src/types';
+import { idlePlan } from '../../src/idle/idle';
+import type { IdleCtx } from '../../src/types';
 
 const base = (o: Partial<IdleCtx> = {}): IdleCtx => ({
   pointer: { x: 400, y: 300 },
@@ -12,84 +12,78 @@ const base = (o: Partial<IdleCtx> = {}): IdleCtx => ({
   seedPhase: 0.3,
   ...o,
 });
-const pt = (v: unknown): Pt => v as Pt;
-const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
 
-describe('idleTarget', () => {
-  it('orbit keeps distance within [0.7r, 1.3r] of the pointer', () => {
-    for (let s = 0; s <= 1; s += 0.1) {
-      for (let t = 0; t < 20; t += 1.7) {
-        const c = base({ seedPhase: s, time: t });
-        const d = dist(pt(idleTarget('orbit', 'wander', 100, c)), c.pointer!);
-        expect(d).toBeGreaterThanOrEqual(70 - 1e-9);
-        expect(d).toBeLessThanOrEqual(130 + 1e-9);
-      }
+describe('idlePlan', () => {
+  it('orbit flows around the pointer (liquid, not tight)', () => {
+    expect(idlePlan('orbit', 'wander', base())).toEqual({ kind: 'flow', center: { x: 400, y: 300 }, tight: false });
+  });
+
+  it('flock flows around the pointer as a tight cluster', () => {
+    expect(idlePlan('flock', 'wander', base())).toEqual({ kind: 'flow', center: { x: 400, y: 300 }, tight: true });
+  });
+
+  it('no pointer: last-touch flows around the last tap', () => {
+    const c = base({ pointer: null, lastTouch: { x: 200, y: 210 } });
+    expect(idlePlan('orbit', 'last-touch', c)).toEqual({ kind: 'flow', center: { x: 200, y: 210 }, tight: false });
+    expect(idlePlan('flock', 'last-touch', c)).toEqual({ kind: 'flow', center: { x: 200, y: 210 }, tight: true });
+  });
+
+  it('no pointer: stay holds still', () => {
+    expect(idlePlan('orbit', 'stay', base({ pointer: null, lastTouch: { x: 1, y: 1 } }))).toEqual({ kind: 'stay' });
+  });
+
+  it('no pointer, last-touch with no tap yet: flows around a point drifting across the viewport', () => {
+    const at = (time: number) => {
+      const p = idlePlan('orbit', 'last-touch', base({ pointer: null, lastTouch: null, time }));
+      expect(p.kind).toBe('flow');
+      return p.kind === 'flow' ? p.center : { x: 0, y: 0 };
+    };
+    const a = at(0);
+    const b = at(4);
+    expect(a).not.toEqual(b);
+    for (const c of [a, b, at(9), at(20)]) {
+      expect(c.x).toBeGreaterThanOrEqual(800 * 0.22);
+      expect(c.x).toBeLessThanOrEqual(800 * 0.78);
+      expect(c.y).toBeGreaterThanOrEqual(600 * 0.25);
+      expect(c.y).toBeLessThanOrEqual(600 * 0.75);
     }
   });
 
-  it('different seedPhase gives different points', () => {
-    const a = pt(idleTarget('orbit', 'wander', 100, base({ seedPhase: 0.2 })));
-    const b = pt(idleTarget('orbit', 'wander', 100, base({ seedPhase: 0.7 })));
-    expect(dist(a, b)).toBeGreaterThan(1);
+  it('no pointer: wander drifts inside the area', () => {
+    for (const np of ['wander'] as const) {
+      const p = idlePlan('orbit', np, base({ pointer: null, lastTouch: null, time: 5 }));
+      expect(p.kind).toBe('point');
+      if (p.kind !== 'point') continue;
+      expect(p.at.x).toBeGreaterThanOrEqual(20);
+      expect(p.at.x).toBeLessThanOrEqual(780);
+      expect(p.at.y).toBeGreaterThanOrEqual(20);
+      expect(p.at.y).toBeLessThanOrEqual(580);
+    }
   });
 
-  it('orbit moves over time', () => {
-    const a = pt(idleTarget('orbit', 'wander', 100, base({ time: 0 })));
-    const b = pt(idleTarget('orbit', 'wander', 100, base({ time: 1 })));
-    expect(dist(a, b)).toBeGreaterThan(1);
-  });
-
-  it('flock uses a tighter, slower orbit', () => {
-    const c = base({ seedPhase: 0.5, time: 3 });
-    const d = dist(pt(idleTarget('flock', 'wander', 100, c)), c.pointer!);
-    expect(d).toBeCloseTo(100 * 0.5 * (0.5 + 0.5), 6);
-    const o0 = pt(idleTarget('orbit', 'wander', 100, base({ seedPhase: 0.2, time: 0 })));
-    const o1 = pt(idleTarget('orbit', 'wander', 100, base({ seedPhase: 0.2, time: 1 })));
-    const f0 = pt(idleTarget('flock', 'wander', 100, base({ seedPhase: 0.2, time: 0 })));
-    const f1 = pt(idleTarget('flock', 'wander', 100, base({ seedPhase: 0.2, time: 1 })));
-    const ang = (p: Pt) => Math.atan2(p.y - 300, p.x - 400);
-    expect(Math.abs(ang(f1) - ang(f0))).toBeLessThan(Math.abs(ang(o1) - ang(o0)));
-  });
-
-  it('no pointer: stay / wander / last-touch', () => {
-    const c = base({ pointer: null, lastTouch: { x: 200, y: 200 } });
-    expect(idleTarget('orbit', 'stay', 100, c)).toBe('stay');
-    const w = pt(idleTarget('orbit', 'wander', 100, c));
-    expect(w.x).toBeGreaterThanOrEqual(20);
-    expect(w.x).toBeLessThanOrEqual(780);
-    const lt = pt(idleTarget('orbit', 'last-touch', 100, c));
-    const d = dist(lt, c.lastTouch!);
-    expect(d).toBeGreaterThanOrEqual(70 - 1e-9);
-    expect(d).toBeLessThanOrEqual(130 + 1e-9);
-  });
-
-  it('last-touch with null lastTouch falls back to a point inside areaRect', () => {
-    const p = pt(idleTarget('flock', 'last-touch', 100, base({ pointer: null, lastTouch: null, time: 5 })));
-    expect(p.x).toBeGreaterThanOrEqual(0);
-    expect(p.x).toBeLessThanOrEqual(800);
-    expect(p.y).toBeGreaterThanOrEqual(0);
-    expect(p.y).toBeLessThanOrEqual(600);
-  });
-
-  it('wander stays inside the inset areaRect', () => {
+  it('wander stays inside the inset areaRect and differs per cursor', () => {
     const area = { x: 100, y: 50, w: 300, h: 200 };
     for (let i = 0; i < 500; i++) {
-      const p = pt(idleTarget('wander', 'stay', 100, base({ areaRect: area, time: i * 0.9, seedPhase: (i % 7) / 7 })));
-      expect(p.x).toBeGreaterThanOrEqual(120 - 1e-9);
-      expect(p.x).toBeLessThanOrEqual(380 + 1e-9);
-      expect(p.y).toBeGreaterThanOrEqual(70 - 1e-9);
-      expect(p.y).toBeLessThanOrEqual(230 + 1e-9);
+      const p = idlePlan('wander', 'stay', base({ areaRect: area, time: i * 0.9, seedPhase: (i % 7) / 7 }));
+      if (p.kind !== 'point') throw new Error('expected point');
+      expect(p.at.x).toBeGreaterThanOrEqual(120 - 1e-9);
+      expect(p.at.x).toBeLessThanOrEqual(380 + 1e-9);
+      expect(p.at.y).toBeGreaterThanOrEqual(70 - 1e-9);
+      expect(p.at.y).toBeLessThanOrEqual(230 + 1e-9);
     }
+    const a = idlePlan('wander', 'stay', base({ seedPhase: 0.2 }));
+    const b = idlePlan('wander', 'stay', base({ seedPhase: 0.7 }));
+    expect(a).not.toEqual(b);
   });
 
   it('wander uses the center for a dimension smaller than 40px', () => {
-    const p = pt(idleTarget('wander', 'stay', 100, base({ areaRect: { x: 10, y: 10, w: 30, h: 500 }, time: 7 })));
-    expect(p.x).toBe(25);
+    const p = idlePlan('wander', 'stay', base({ areaRect: { x: 10, y: 10, w: 30, h: 500 }, time: 7 }));
+    expect(p.kind === 'point' && p.at.x).toBe(25);
   });
 
-  it('leave and hide return strings, with or without a pointer', () => {
-    expect(idleTarget('leave', 'stay', 100, base())).toBe('leave');
-    expect(idleTarget('hide', 'stay', 100, base({ pointer: null }))).toBe('hide');
-    expect(idleTarget('leave', 'wander', 100, base({ pointer: null }))).toBe('leave');
+  it('leave and hide, with or without a pointer', () => {
+    expect(idlePlan('leave', 'stay', base())).toEqual({ kind: 'leave' });
+    expect(idlePlan('hide', 'stay', base({ pointer: null }))).toEqual({ kind: 'hide' });
+    expect(idlePlan('leave', 'wander', base({ pointer: null }))).toEqual({ kind: 'leave' });
   });
 });

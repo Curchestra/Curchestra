@@ -4,7 +4,7 @@ import { scan } from '../scanner/scan';
 import { createScheduler } from '../scheduler/buckets';
 import type { Config, Host, Mode, Piece, Rect, Run, Scheduler, TaskGraph } from '../types';
 
-/** Per-area build state: its own pieces, graph and scheduler. */
+/** Build state of one area. */
 export interface Area {
   root: Element;
   cfg: Config;
@@ -17,9 +17,9 @@ export interface Area {
   done: boolean;
   run: Run;
   resolve: () => void;
-  /** live viewport rect of the root, refreshed in the read phase */
+  /** live viewport rect of the root */
   rect: Rect;
-  /** tasks completed silently by pruning; they may still sit in the scheduler queue */
+  /** tasks finished by pruning (may still be queued) */
   pruned: Set<number>;
 }
 
@@ -28,7 +28,7 @@ export function readRect(el: Element): Rect {
   return { x: r.left, y: r.top, w: r.width, h: r.height };
 }
 
-/** Text line boxes: non-empty client rects, rects whose tops are within 2 px merged into one line. */
+/** Text line rects, merged when tops are within 2 px. */
 export function readLines(range: Range, el: Element, out: Rect[]): Rect[] {
   range.selectNodeContents(el);
   const list = range.getClientRects();
@@ -57,7 +57,7 @@ export function readLines(range: Range, el: Element, out: Rect[]): Rect[] {
   return out;
 }
 
-/** Drop pieces inside already-active inner areas (R17) and renumber the rest. */
+/** Drop pieces inside active inner areas and renumber. */
 function dropInner(pieces: Piece[], inner: Element[]): Piece[] {
   if (inner.length === 0) return pieces;
   const ids = new Map<number, number>();
@@ -81,7 +81,7 @@ export function buildArea(
 ): Omit<Area, 'run' | 'resolve'> {
   const pieces = dropInner(scan(host, root, { skip: cfg.skip, maxTasks: cfg.maxTasks }), inner);
   const { graph, ready } = plan(pieces, cfg.effects);
-  // Reads before the first write: a read after markArea would force a style recalc.
+  // read before the first write
   const rect = readRect(root);
   const vh = host.viewport().h;
   markArea(root, pieces.map((p) => p.el));

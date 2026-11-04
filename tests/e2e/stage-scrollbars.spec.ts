@@ -25,7 +25,7 @@ test('the canvas CSS size matches its backing size, so decos land on their eleme
     const dpr = window.devicePixelRatio || 1;
     // Where canvas x = b.right ends up on screen once the backing store is stretched to the CSS box.
     const shownRight = css.left + (b.right * css.width) / (s.el.width / dpr);
-    s.draw([], [{ t: 'outline', r: { x: b.left, y: b.top, w: b.width, h: b.height }, color: '#00f' }], false, (window as any).vp());
+    s.draw([], [{ t: 'sel', r: { x: b.left, y: b.top, w: b.width, h: b.height } }], false, (window as any).vp());
     const out = {
       scrollbar: innerWidth - document.documentElement.clientWidth,
       cssW: s.el.clientWidth,

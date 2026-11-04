@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { plan } from '../../src/planner/plan';
 import type { Config, Piece } from '../../src/types';
 
-const fx: Config['effects'] = { guides: true, duplicate: true, pen: true, sizeBadge: true, typing: true };
+const fx: Config['effects'] = { guides: true, duplicate: true, pen: true, sizeBadge: true, typing: true, rulers: true, snap: true, grow: true };
 
 describe('planner perf', () => {
   it('2000-piece chain plans in < 20ms', () => {

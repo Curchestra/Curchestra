@@ -1,7 +1,7 @@
 {
   "name": "curchestra",
   "version": "0.1.0",
-  "description": "A cursor-swarm effect that builds a website's real DOM.",
+  "description": "A cursor orchestra that builds a website's real DOM.",
   "type": "module",
   "sideEffects": [
     "*.css"

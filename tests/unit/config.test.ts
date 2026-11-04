@@ -7,14 +7,26 @@ describe('config', () => {
   test('defaults match spec', () => {
     const c = resolveConfig();
     expect(c.preset).toBe('default');
-    expect(c.agents).toEqual({ min: 6, max: 30, showNames: true });
+    expect(c.agents).toEqual({ min: 6, max: 30, showNames: false });
     expect(c.speed).toBe(1);
-    expect(c.idle).toEqual({ behavior: 'orbit', after: 1.5, radius: 60, noPointer: 'last-touch' });
-    expect(c.effects).toEqual({ guides: true, duplicate: true, pen: true, sizeBadge: true, typing: true });
+    expect(c.idle).toEqual({ behavior: 'orbit', after: 1.5, radius: 120, noPointer: 'last-touch' });
+    expect(c.effects).toEqual({
+      guides: true, duplicate: true, pen: true, sizeBadge: true, typing: true, rulers: true, snap: true, grow: true,
+    });
     expect(c.sound).toBe(false);
-    expect([c.theme, c.reducedMotion, c.skipOnClick, c.persist]).toEqual(['auto', 'respect', true, true]);
+    expect(c.intro).toBe(false);
+    expect([c.theme, c.reducedMotion, c.skipOnClick, c.persist]).toEqual(['auto', 'respect', false, true]);
     expect([c.maxTasks, c.failsafe, c.zIndex]).toEqual([1500, 15000, 2147483000]);
     expect(c.skip).toEqual([]);
+  });
+  test('new options: scroll trigger, intro, sound shortcut, effect switches', () => {
+    const warn = vi.fn();
+    expect(validate({ trigger: 'scroll', intro: '#logo', sound: true, effects: { rulers: false, snap: false, grow: false } }, warn)).toEqual({
+      trigger: 'scroll', intro: '#logo', sound: true, effects: { rulers: false, snap: false, grow: false },
+    });
+    expect(warn).not.toHaveBeenCalled();
+    expect(validate({ intro: 3 }, warn)).toEqual({});
+    expect(warn).toHaveBeenCalledTimes(1);
   });
   test('presets', () => {
     expect(resolveConfig({ preset: 'calm' })).toMatchObject({ agents: { min: 4, max: 12 }, speed: 0.8, effects: { duplicate: false, pen: false } });

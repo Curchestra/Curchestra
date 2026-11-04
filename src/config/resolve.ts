@@ -39,7 +39,7 @@ export function readDataAttrs(el: Element): DeepPartial<Config> {
   const preset = el.getAttribute('data-preset');
   if (preset) out.preset = preset as Config['preset'];
   const trigger = el.getAttribute('data-cu-trigger');
-  if (trigger === 'load' || trigger === 'in-view' || trigger === 'manual') out.trigger = trigger;
+  if (trigger === 'load' || trigger === 'in-view' || trigger === 'manual' || trigger === 'scroll') out.trigger = trigger;
   const speed = el.getAttribute('data-cu-speed');
   if (speed !== null && speed.trim() !== '' && Number(speed) > 0 && Number.isFinite(Number(speed))) out.speed = Number(speed);
   const idle = el.getAttribute('data-cu-idle');

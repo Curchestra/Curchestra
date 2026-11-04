@@ -76,22 +76,57 @@ test('builds the landing page: done resolves, nothing left hidden, complete fire
   expect(r.completes).toBe(1);
 });
 
-test('orbit: idle cursors gather around the pointer after complete', async ({ page }) => {
+test('liquid orbit: idle cursors flow in a ring around the pointer, as arrows, outside its bubble', async ({ page }) => {
   test.setTimeout(60_000);
   await build(page, { idle: { behavior: 'orbit' } });
   await page.waitForFunction(() => (window as any).completes === 1, null, { timeout: 45_000 });
   await page.mouse.move(400, 300);
-  // Cursors spring toward the pointer; poll until all of them have settled within the orbit radius.
-  await expect
-    .poll(
-      () =>
-        page.evaluate(() => {
-          const cs = (window as any).eng.stats().cursors.filter((c: any) => c.phase !== "leave");
-          return cs.length > 0 && cs.every((c: any) => Math.hypot(c.x - 400, c.y - 300) <= 1.3 * 60 + 10);
-        }),
-      { timeout: 15_000 },
-    )
-    .toBe(true);
+  const radius = await page.evaluate(() => (window as any).cu.resolveConfig().idle.radius);
+  const ring = () =>
+    page.evaluate((R) => {
+      const cs = (window as any).eng.stats().cursors.filter((c: any) => c.phase === 'idle');
+      const ds = cs.map((c: any) => Math.hypot(c.x - 400, c.y - 300));
+      const mean = ds.reduce((s: number, v: number) => s + v, 0) / Math.max(1, ds.length);
+      return {
+        n: cs.length,
+        inRing: cs.length > 0 && ds.every((d: number) => d < R * 2.6) && mean > R * 0.5 && mean < R * 1.8,
+        outsideBubble: ds.every((d: number) => d >= 45),
+        arrows: cs.every((c: any) => c.shape === 'arrow'),
+        pts: cs.map((c: any) => [c.x, c.y, c.angle]),
+      };
+    }, radius);
+  await expect.poll(async () => (await ring()).inRing, { timeout: 15_000 }).toBe(true);
+  const a = await ring();
+  expect(a.outsideBubble).toBe(true);
+  expect(a.arrows).toBe(true);
+  // still flowing (not parked), and turned to face the flow
+  await page.waitForTimeout(300);
+  const b = await ring();
+  const moved = a.pts.filter((p: number[], i: number) => b.pts[i] && Math.hypot(b.pts[i][0] - p[0], b.pts[i][1] - p[1]) > 5);
+  expect(moved.length).toBeGreaterThan(a.n / 2);
+  expect(b.pts.some((p: number[]) => Math.abs(p[2]) > 10)).toBe(true);
+});
+
+test('cursor shape follows the job: tool while working, back to the arrow when done', async ({ page }) => {
+  test.setTimeout(60_000);
+  await build(page, { idle: { behavior: 'wander' } });
+  const seen = await page.evaluate(async () => {
+    const eng = (window as any).eng;
+    const byPhase: Record<string, Set<string>> = { work: new Set(), travel: new Set(), idle: new Set() };
+    while ((window as any).completes !== 1) {
+      for (const c of eng.stats().cursors) byPhase[c.phase]?.add(c.shape);
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    for (let i = 0; i < 10; i++) {
+      for (const c of eng.stats().cursors) byPhase[c.phase]?.add(c.shape);
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    return { work: [...byPhase.work], travel: [...byPhase.travel], idle: [...byPhase.idle] };
+  });
+  expect(seen.work).toEqual(expect.arrayContaining(['ibeam', 'cross']));
+  // on the way to a job the cursor already shows its tool (crosshair for boxes, pen for borders…)
+  expect(seen.travel).toEqual(expect.arrayContaining(['cross']));
+  expect(seen.idle).toEqual(['arrow']);
 });
 
 test('sticky nav: the outline tracks the live rect when the page scrolls mid-task', async ({ page }) => {
@@ -103,7 +138,7 @@ test('sticky nav: the outline tracks the live rect when the page scrolls mid-tas
     const eng = cu.createEngine(m.host, cfg);
     eng.addArea(document.body, cfg, 'page');
     const nav = document.querySelector('#nav')!;
-    const near = (d: any, r: DOMRect) => d.t === 'outline' && Math.abs(d.r.x - r.left) <= 2 && Math.abs(d.r.y - r.top) <= 2;
+    const near = (d: any, r: DOMRect) => d.t === 'sel' && Math.abs(d.r.x - r.left) <= 2 && Math.abs(d.r.y - r.top) <= 2;
     let found = false;
     for (let i = 0; i < 300 && !found; i++) {
       m.step(1);
@@ -310,6 +345,8 @@ test('an outer root skips an inner active area', async ({ page }) => {
     const inner = eng.addArea(document.querySelector('#cards'), cfg, 'section');
     const outer = eng.addArea(document.body, cfg, 'page');
     const distinct = inner !== outer;
+    // a page is built as the visitor scrolls to it: show the whole page once
+    window.scrollTo(0, document.documentElement.scrollHeight);
     // the inner card count of tasks must match a standalone build: 6 cards + 6 h3 + 6 p
     m.step(900);
     return { distinct, inCount: els.filter((e) => e === 'in').length, hidden: document.querySelectorAll('[data-cu="h"]').length };
@@ -494,7 +531,7 @@ test('a throwing plugin is logged and does not break the frame (T13)', async ({ 
     const orig = console.error;
     console.error = (...a: unknown[]) => void logged.push(a);
     let unlocked = 0;
-    eng.use({ onTask() { throw new Error('boom'); }, onKey() { throw new Error('boom'); }, unlock: () => void unlocked++ });
+    eng.use({ onFx() { throw new Error('boom'); }, onStart() { throw new Error('boom'); }, unlock: () => void unlocked++ });
     eng.addArea(document.querySelector('#hero'), cfg, 'section');
     m.step(600);
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }));
@@ -507,4 +544,62 @@ test('a throwing plugin is logged and does not break the frame (T13)', async ({ 
   expect(r.tag).toBe('[curchestra]');
   expect(r.unlocked).toBe(2);
   expect(r.hidden).toBe(0);
+});
+
+test('idle cursors never teleport when a section is rebuilt after they orbited the pointer', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const w = window as any;
+    const cu = w.cu;
+    const m = w.manualHost();
+    const cfg = cu.resolveConfig({ seed: 3, speed: 1, agents: { min: 10 }, idle: { behavior: 'orbit', after: 0.2 } });
+    const eng = cu.createEngine(m.host, cfg);
+    const point = (x: number, y: number) =>
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y, pointerType: 'mouse' }));
+    const cards = document.querySelector('#cards')!;
+    const building = () => !!(cards.matches('[data-cu="h"]') || cards.querySelector('[data-cu="h"]'));
+    window.scrollTo(0, 0);
+    point(900, 120);
+    eng.addArea(cards, cfg, 'section');
+    // the stroll and the orbit are a lazy chunk: let it land
+    await new Promise((res) => setTimeout(res, 300));
+    let idleJump = 0;
+    let startJump = 0;
+    let idlePairs = 0;
+    let starts = 0;
+    for (let round = 0; round < 3; round++) {
+      // rebuild the same section after the crew orbited the pointer somewhere else
+      if (round) eng.addArea(cards, cfg, 'section');
+      let last = new Map<number, any>();
+      for (let i = 0; i < 2400 && (i === 0 || building()); i++) {
+        m.step(1);
+        const now = new Map<number, any>();
+        for (const c of eng.stats().cursors) {
+          const p = last.get(c.id);
+          const d = p ? Math.hypot(c.x - p.x, c.y - p.y) : 0;
+          if (p && p.phase === 'idle' && c.phase === 'idle') {
+            idlePairs++;
+            idleJump = Math.max(idleJump, d);
+          }
+          if (p && p.phase === 'idle' && c.phase === 'travel') {
+            starts++;
+            startJump = Math.max(startJump, d);
+          }
+          now.set(c.id, c);
+        }
+        last = now;
+      }
+      for (let i = 0; i < 90; i++) {
+        point(900 - i * 8, 120 + i * 4);
+        m.step(2);
+      }
+    }
+    return { idleJump, startJump, idlePairs, starts };
+  });
+  expect(r.idlePairs).toBeGreaterThan(0);
+  expect(r.starts).toBeGreaterThan(0);
+  // strolling or orbiting stays smooth (fast flow tops out near 50 px a frame); a teleport
+  // jumps hundreds of px in one frame
+  expect(r.idleJump).toBeLessThan(80);
+  // a trip starts from rest (only very short trips, a few frames long, cover tens of px at once)
+  expect(r.startJump).toBeLessThan(80);
 });

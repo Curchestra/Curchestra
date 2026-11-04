@@ -9,19 +9,19 @@ describe('ssr (no window)', () => {
 
   test('every method is a no-op; runs are already done', async () => {
     const { curchestra } = await import('../../src/index');
-    const swarm = curchestra({ speed: 2 });
-    const page = swarm.page();
+    const orchestra = curchestra({ speed: 2 });
+    const page = orchestra.page();
     await expect(page.done).resolves.toBeUndefined();
     page.finish();
     page.cancel();
-    await expect(swarm.section('#x').done).resolves.toBeUndefined();
-    const off = swarm.on('complete', () => {});
+    await expect(orchestra.section('#x').done).resolves.toBeUndefined();
+    const off = orchestra.on('complete', () => {});
     expect(typeof off).toBe('function');
     off();
-    swarm.pause();
-    swarm.resume();
-    swarm.finish();
-    swarm.destroy();
+    orchestra.pause();
+    orchestra.resume();
+    orchestra.finish();
+    orchestra.destroy();
   });
 
   test('transition awaits update() exactly once', async () => {

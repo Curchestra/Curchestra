@@ -90,26 +90,35 @@ test('hidden cursors and all deco kinds draw without error', async ({ page }) =>
       shape: 'dup', press: 1, task: null, phase: 'hidden', idleFor: 0, seedPhase: 0, alpha: 1,
     };
     const decos = [
-      { t: 'outline', r: { x: 10, y: 10, w: 50, h: 30 }, color: '#00f' },
-      { t: 'badge', x: 70, y: 10, text: '50 x 30', color: '#00f' },
+      { t: 'sel', r: { x: 30, y: 30, w: 50, h: 30 }, handles: true, badge: '50 × 30', rulerLines: true },
+      { t: 'sel', r: { x: 600, y: 30, w: 50, h: 30 }, red: true },
+      { t: 'measure', a: { x: 80, y: 45 }, b: { x: 600, y: 45 }, label: '520' },
       { t: 'caret', x: 80, y: 50, h: 16, color: '#0a0' },
-      { t: 'guide', x: 200, color: '#f0f' },
-      { t: 'path', pts: [{ x: 10, y: 100 }, { x: 60, y: 120 }, { x: 90, y: 90 }], color: '#f00' },
-      { t: 'ghost', r: { x: 120, y: 120, w: 40, h: 40 }, color: '#f00' },
+      { t: 'guide', x: 200, color: '#f0f', flash: 1 },
+      { t: 'pen', pts: [{ x: 30, y: 100 }, { x: 60, y: 120 }], tail: { x: 90, y: 90 } },
+      { t: 'hilite', r: { x: 120, y: 120, w: 40, h: 40 } },
       { t: 'media', r: { x: 400, y: 400, w: 100, h: 80 } },
     ];
-    s.draw([base], decos, true, (window as any).vp());
+    s.draw([base], decos, true, (window as any).vp(), { t: 1, sx: 0, sy: 0 });
     const a = (x: number, y: number) => {
       const d = window.devicePixelRatio || 1;
       return s.el.getContext('2d').getImageData(Math.round(x * d), Math.round(y * d), 1, 1).data[3];
     };
-    const out = { hiddenCursor: a(303, 303), media: a(410, 410), guide: a(200, 500) };
+    const out = {
+      hiddenCursor: a(303, 303), media: a(410, 410), guide: a(200, 500),
+      handle: a(30, 30), ruler: a(300, 10), rulerLeft: a(10, 300), vertex: a(30, 100), hilite: a(140, 140),
+    };
     s.destroy();
     return out;
   });
   expect(r.hiddenCursor).toBe(0);
   expect(r.media).toBeGreaterThan(0);
   expect(r.guide).toBeGreaterThan(0);
+  expect(r.handle).toBeGreaterThan(0);
+  expect(r.ruler).toBeGreaterThan(0);
+  expect(r.rulerLeft).toBeGreaterThan(0);
+  expect(r.vertex).toBeGreaterThan(0);
+  expect(r.hilite).toBeGreaterThan(0);
 });
 
 test('dirty rect: moving a cursor clears the old position', async ({ page }) => {
@@ -135,6 +144,33 @@ test('dirty rect: moving a cursor clears the old position', async ({ page }) => 
   expect(r.atA1).toBeGreaterThan(0);
   expect(r.atA).toBe(0);
   expect(r.atB).toBeGreaterThan(0);
+});
+
+test('tilt: a cursor is drawn rotated about its hotspot', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const cu = (window as any).cu;
+    const s = cu.createStage(cu.browserHost(), 99, 'light');
+    const a = (x: number, y: number) => {
+      const d = window.devicePixelRatio || 1;
+      return s.el.getContext('2d').getImageData(Math.round(x * d), Math.round(y * d), 1, 1).data[3];
+    };
+    const c = {
+      id: 1, name: '', color: '#F24E1E', x: 200, y: 200,
+      sx: { x: 0, v: 0 }, sy: { x: 0, v: 0 },
+      shape: 'arrow', press: 0, angle: 0, task: null, phase: 'idle', idleFor: 0, seedPhase: 0, alpha: 1,
+    };
+    s.draw([c], [], false, (window as any).vp());
+    const upright = { below: a(206, 210), above: a(194, 190) };
+    s.draw([{ ...c, angle: 180 }], [], false, (window as any).vp());
+    const flipped = { below: a(206, 210), above: a(194, 190) };
+    s.destroy();
+    return { upright, flipped };
+  });
+  // upright the arrow body hangs down-right of the tip; turned 180° it points the other way
+  expect(r.upright.below).toBeGreaterThan(0);
+  expect(r.upright.above).toBe(0);
+  expect(r.flipped.below).toBe(0);
+  expect(r.flipped.above).toBeGreaterThan(0);
 });
 
 test('draw uses the viewport it is given and reads no layout itself', async ({ page }) => {

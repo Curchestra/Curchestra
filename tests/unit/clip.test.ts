@@ -49,3 +49,33 @@ describe('clipPolygon', () => {
     expect(area(pts)).toBeCloseTo(1000);
   });
 });
+
+describe('clipPolygon on a text panel (box)', () => {
+  // a 200x100 panel with 20 px padding and two 160x20 lines of code
+  const panel = { x: 0, y: 0, w: 200, h: 100 };
+  const code = [
+    { x: 20, y: 20, w: 160, h: 20 },
+    { x: 20, y: 40, w: 160, h: 20 },
+  ];
+
+  it('progress 0 is empty, progress 1 is the whole panel (padding included)', () => {
+    expect(area(parse(clipPolygon(panel, code, 0, false, true)))).toBe(0);
+    expect(area(parse(clipPolygon(panel, code, 1, false, true)))).toBe(200 * 100);
+  });
+
+  it('halfway through the first line: a band from the top edge, wiped up to the caret', () => {
+    // caret at 20 + 80 = 100; band from y 0 to the line bottom (40)
+    expect(area(parse(clipPolygon(panel, code, 0.25, false, true)))).toBe(100 * 40);
+  });
+
+  it('first line done, second half typed: the first band is full width, the last band runs to the bottom', () => {
+    // band 1: 200 x 40; band 2: caret at 100, from 40 to the panel bottom (60 tall)
+    expect(area(parse(clipPolygon(panel, code, 0.75, false, true)))).toBe(200 * 40 + 100 * 60);
+  });
+
+  it('rtl wipes from the right edge', () => {
+    const pts = parse(clipPolygon(panel, code, 0.25, true, true));
+    expect(area(pts)).toBe(100 * 40);
+    expect(Math.min(...pts.map(([x]) => x))).toBe(100);
+  });
+});

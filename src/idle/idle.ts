@@ -3,6 +3,14 @@ import type { Config, IdleCtx, Pt } from '../types';
 const TAU = Math.PI * 2;
 const INSET = 20;
 
+/** What an idle cursor does next. */
+export type IdlePlan =
+  | { kind: 'flow'; center: Pt; tight: boolean }
+  | { kind: 'point'; at: Pt }
+  | { kind: 'stay' }
+  | { kind: 'leave' }
+  | { kind: 'hide' };
+
 function wander(ctx: IdleCtx): Pt {
   const { areaRect: a, time, seedPhase: s } = ctx;
   const axis = (pos: number, size: number, freq: number, phase: number): number => {
@@ -15,26 +23,22 @@ function wander(ctx: IdleCtx): Pt {
   };
 }
 
-function around(center: Pt, flock: boolean, radius: number, ctx: IdleCtx): Pt {
-  const s = ctx.seedPhase;
-  const r = flock ? radius * 0.5 * (0.5 + s) : radius * (0.7 + 0.6 * s);
-  const speed = (0.6 + 0.8 * s) * (s < 0.5 ? 1 : -1) * (flock ? 0.3 : 1);
-  const th = TAU * s + ctx.time * speed;
-  return { x: center.x + r * Math.cos(th), y: center.y + r * Math.sin(th) };
+/** A slowly drifting center, used when there is no pointer. */
+export function driftCenter(vp: { w: number; h: number }, time: number): Pt {
+  return { x: vp.w * (0.5 + 0.28 * Math.sin(time * 0.37)), y: vp.h * (0.5 + 0.25 * Math.sin(time * 0.53 + 1)) };
 }
 
-export function idleTarget(
+export function idlePlan(
   behavior: Config['idle']['behavior'],
   noPointer: Config['idle']['noPointer'],
-  radius: number,
   ctx: IdleCtx,
-): Pt | 'leave' | 'hide' | 'stay' {
-  if (behavior === 'leave') return 'leave';
-  if (behavior === 'hide') return 'hide';
-  if (behavior === 'wander') return wander(ctx);
-  const flock = behavior === 'flock';
-  if (ctx.pointer) return around(ctx.pointer, flock, radius, ctx);
-  if (noPointer === 'stay') return 'stay';
-  if (noPointer === 'last-touch' && ctx.lastTouch) return around(ctx.lastTouch, flock, radius, ctx);
-  return wander(ctx);
+): IdlePlan {
+  if (behavior === 'leave') return { kind: 'leave' };
+  if (behavior === 'hide') return { kind: 'hide' };
+  if (behavior === 'wander') return { kind: 'point', at: wander(ctx) };
+  const tight = behavior === 'flock';
+  if (ctx.pointer) return { kind: 'flow', center: ctx.pointer, tight };
+  if (noPointer === 'stay') return { kind: 'stay' };
+  if (noPointer === 'last-touch') return { kind: 'flow', center: ctx.lastTouch ?? driftCenter(ctx.viewport, ctx.time), tight };
+  return { kind: 'point', at: wander(ctx) };
 }

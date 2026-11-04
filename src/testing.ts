@@ -1,4 +1,4 @@
-// Re-exports internals for the e2e lab page only. Not part of the package exports.
+// Internals for the e2e pages; not exported by the package.
 export * from './host/host';
 export * from './reveal/reveal';
 export { scan } from './scanner/scan';

@@ -3,7 +3,7 @@ import { completeTask, plan } from '../../src/planner/plan';
 import type { Config, Piece, PieceKind } from '../../src/types';
 
 const fx = (o: Partial<Config['effects']> = {}): Config['effects'] => ({
-  guides: true, duplicate: true, pen: true, sizeBadge: true, typing: true, ...o,
+  guides: true, duplicate: true, pen: true, sizeBadge: true, typing: true, rulers: true, snap: true, grow: true, ...o,
 });
 
 let n = 0;

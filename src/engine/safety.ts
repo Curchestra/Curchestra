@@ -8,21 +8,18 @@ export function reportError(host: Host, err: unknown): void {
 
 const resolvedRun = (): Run => ({ done: Promise.resolve(), finish() {}, cancel() {} });
 
-/**
- * Safety net around an engine: failsafe timer, error recovery around addArea,
- * reduced motion, skip-on-click/focus and live removals. Returns a disposer.
- */
+/** Failsafe, error recovery, reduced motion, skip on click/focus and live removals. */
 export function attachSafety(engine: Engine, host: Host, cfg: Config): () => void {
   const win = host.win;
   const g = win as unknown as typeof globalThis;
   const doc = host.doc;
   const original = engine.addArea.bind(engine);
   const observers = new Set<MutationObserver>();
-  /** active runs and their failsafe timers (0 when none) */
+  /** active runs and their failsafe timers */
   const active = new Map<Run, number>();
   let off = false;
 
-  /** Watch a new area: live removals, plus a failsafe armed from this area's own start (R31). */
+  /** Watch removals and arm the failsafe from the area's start. */
   function watch(root: Element, run: Run, failsafe: number): void {
     const mo = new g.MutationObserver((recs) => {
       if (recs.some((r) => r.removedNodes.length > 0)) engine.__prune(root);
@@ -34,7 +31,7 @@ export function attachSafety(engine: Engine, host: Host, cfg: Config): () => voi
     const stop = () => {
       mo.disconnect();
       observers.delete(mo);
-      // However the area ended (finish, cancel, failsafe), disarm its timer.
+      // disarm however it ended
       const t = active.get(run);
       if (t) win.clearTimeout(t);
       active.delete(run);
@@ -54,12 +51,12 @@ export function attachSafety(engine: Engine, host: Host, cfg: Config): () => voi
       unmarkArea(root, []);
       return resolvedRun();
     }
-    // A root inside an active area gets that area's Run (R17): it is already watched.
+    // a root inside an active area is already watched
     if (!active.has(run)) watch(root, run, area.failsafe);
     return run;
   };
 
-  /** The unfinished run for a pointer position, even over hidden (unhittable) content. */
+  /** Unfinished run at a pointer position, even over hidden content. */
   function runAt(target: EventTarget | null, x: number | null, y: number | null): Run | null {
     if (target instanceof g.Element) {
       const r = engine.areaFor(target);
@@ -76,22 +73,28 @@ export function attachSafety(engine: Engine, host: Host, cfg: Config): () => voi
     return null;
   }
 
+  /** last pointer press; focus right after it is a click, not keyboard */
+  let pressedAt = -Infinity;
+  const onPress = () => {
+    pressedAt = host.now();
+  };
   const onDown = (e: Event) => {
     const p = e as PointerEvent;
     runAt(e.target, p.clientX, p.clientY)?.finish();
   };
   const onFocus = (e: Event) => {
+    if (host.now() - pressedAt < 500) return;
     runAt(e.target, null, null)?.finish();
   };
-  // Hidden content cannot take focus, so Tab would skip it: reveal before the browser moves focus.
+  // hidden content cannot take focus: reveal before Tab moves it
   const onKey = (e: Event) => {
     if ((e as KeyboardEvent).key === 'Tab' && active.size > 0) engine.finishAll();
   };
-  if (cfg.skipOnClick) {
-    doc.addEventListener('keydown', onKey, true);
-    doc.addEventListener('pointerdown', onDown, true);
-    doc.addEventListener('focusin', onFocus, true);
-  }
+  // keyboard always reveals; clicks skip only with skipOnClick
+  doc.addEventListener('keydown', onKey, true);
+  doc.addEventListener('focusin', onFocus, true);
+  doc.addEventListener('pointerdown', onPress, true);
+  if (cfg.skipOnClick) doc.addEventListener('pointerdown', onDown, true);
 
   return () => {
     off = true;
@@ -100,6 +103,7 @@ export function attachSafety(engine: Engine, host: Host, cfg: Config): () => voi
     for (const mo of observers) mo.disconnect();
     observers.clear();
     doc.removeEventListener('pointerdown', onDown, true);
+    doc.removeEventListener('pointerdown', onPress, true);
     doc.removeEventListener('focusin', onFocus, true);
     doc.removeEventListener('keydown', onKey, true);
   };

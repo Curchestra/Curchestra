@@ -3,6 +3,23 @@ import type { Host, Rect, RevealOp } from '../types';
 const CSS = '[data-cu="h"]{visibility:hidden!important}[data-cu="v"]{visibility:visible!important}';
 const styleRefs = new WeakMap<Document, number>();
 const clipped = new Set<Element>();
+/** Elements we transformed, with their own inline transform. */
+const moved = new Map<Element, { t: string; o: string }>();
+
+function unmove(el: Element): void {
+  const was = moved.get(el);
+  if (!was) return;
+  const st = (el as HTMLElement).style;
+  st.transform = was.t;
+  st.transformOrigin = was.o;
+  moved.delete(el);
+}
+
+/** Clear our clip and transform on `el`. */
+function restore(el: Element): void {
+  if (clipped.delete(el)) (el as HTMLElement).style.clipPath = '';
+  unmove(el);
+}
 
 export function installStyles(host: Host): () => void {
   const doc = host.doc;
@@ -33,11 +50,34 @@ export function markArea(root: Element, pieces: Element[]): void {
 
 const f = (n: number) => `${Math.round(n * 100) / 100}px`;
 
-export function clipPolygon(elRect: Rect, lines: Rect[], progress: number, rtl: boolean): string {
+/** Clip for typed text at `progress` (0..1); `box` text reveals full-height bands per line. */
+export function clipPolygon(elRect: Rect, lines: Rect[], progress: number, rtl: boolean, box = false): string {
   const zero = 'polygon(0px 0px, 0px 0px, 0px 0px)';
   const total = lines.reduce((a, l) => a + l.w, 0);
   if (!(progress > 0) || lines.length === 0 || total <= 0) return zero;
   const covered = Math.min(1, progress) * total;
+  if (box) {
+    const W = elRect.w;
+    const H = elRect.h;
+    const edge: [number, number][] = [];
+    let start = 0;
+    let top = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      const frac = l.w > 0 ? Math.min(1, Math.max(0, (covered - start) / l.w)) : 0;
+      start += l.w;
+      if (frac <= 0) break;
+      const bot = i === lines.length - 1 ? H : Math.max(top, l.y - elRect.y + l.h);
+      const caret = rtl ? l.x - elRect.x + l.w * (1 - frac) : l.x - elRect.x + l.w * frac;
+      const x = frac >= 1 ? (rtl ? 0 : W) : caret;
+      edge.push([x, top], [x, bot]);
+      top = bot;
+    }
+    if (edge.length === 0) return zero;
+    const side = rtl ? W : 0;
+    const pts: [number, number][] = [[side, 0], ...edge, [side, top]];
+    return `polygon(${pts.map(([x, y]) => `${f(x)} ${f(y)}`).join(', ')})`;
+  }
   const left: [number, number][] = [];
   const right: [number, number][] = [];
   let start = 0;
@@ -84,6 +124,7 @@ export function applyOps(ops: RevealOp[]): void {
           o.lines,
           o.progress,
           o.rtl,
+          o.box,
         );
         clipped.add(el);
         break;
@@ -92,26 +133,33 @@ export function applyOps(ops: RevealOp[]): void {
         (el as HTMLElement).style.clipPath = '';
         clipped.delete(el);
         break;
+      case 'xform': {
+        const st = (el as HTMLElement).style;
+        if (o.dx === 0 && o.dy === 0 && o.s === 1) {
+          unmove(el);
+          break;
+        }
+        if (!moved.has(el)) moved.set(el, { t: st.transform, o: st.transformOrigin });
+        st.transformOrigin = '0 0';
+        st.transform = `translate(${f(o.dx)}, ${f(o.dy)})${o.s !== 1 ? ` scale(${Math.round(o.s * 1000) / 1000})` : ''}`;
+        break;
+      }
     }
   }
 }
 
-/** Area done: show the root and every piece, and clear clips this module set on them. */
+/** Show the root and its pieces, clear clips. */
 export function revealArea(root: Element, pieces: Element[]): void {
   for (const el of [root, ...pieces]) {
     el.setAttribute('data-cu', 'v');
-    if (clipped.delete(el)) (el as HTMLElement).style.clipPath = '';
+    restore(el);
   }
 }
 
-/**
- * R32: the build of `root` is over and no enclosing area is still building, so hiding is no longer
- * needed: drop data-cu (and clips) from `root` and everything under it, except inside `keep`
- * (inner areas still building).
- */
+/** Drop marks and clips under `root`, except inside `keep` (still building). */
 export function unmarkArea(root: Element, keep: Element[]): void {
   const drop = (el: Element) => {
-    if (clipped.delete(el)) (el as HTMLElement).style.clipPath = '';
+    restore(el);
     el.removeAttribute('data-cu');
   };
   drop(root);
@@ -121,6 +169,7 @@ export function unmarkArea(root: Element, keep: Element[]): void {
 export function revealAll(doc: Document): void {
   for (const el of clipped) (el as HTMLElement).style.clipPath = '';
   clipped.clear();
+  for (const el of [...moved.keys()]) unmove(el);
   doc.querySelectorAll('[data-cu]').forEach((el) => el.removeAttribute('data-cu'));
   doc.querySelectorAll('style[data-cu-style]').forEach((s) => s.remove());
   styleRefs.delete(doc);

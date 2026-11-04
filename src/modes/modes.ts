@@ -19,10 +19,11 @@ export interface Curchestra {
   on(e: EngineEvent, fn: (p?: unknown) => void): () => void;
 }
 
-// Dev-only code (R25) is guarded by the literal `process.env.NODE_ENV !== 'production'` at each use:
-// a named constant is not constant-folded by bundlers, the literal comparison is.
+// Dev-only code uses the literal `process.env.NODE_ENV` check so bundlers can strip it.
 
 const FADE_MS = 180;
+/** intro length when no scroll is awaited, ms */
+const INTRO_MS = 1400;
 const SKIP_TAGS = new Set(['script', 'style', 'link', 'template', 'noscript']);
 
 const doneRun = (): Run => ({ done: Promise.resolve(), finish() {}, cancel() {} });
@@ -30,7 +31,7 @@ const doneRun = (): Run => ({ done: Promise.resolve(), finish() {}, cancel() {} 
 const isPlain = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
-/** Whether `doc` accepts `s` as a selector. An invalid one would throw inside the scanner. */
+/** Whether `s` is a valid selector. */
 function selectorCheck(doc: Document): (s: string) => boolean {
   const frag = doc.createDocumentFragment();
   return (s) => {
@@ -43,7 +44,7 @@ function selectorCheck(doc: Document): (s: string) => boolean {
   };
 }
 
-/** A group of areas behind one aggregate Run; areas may still be waiting for their trigger. */
+/** One area in a group behind one Run. */
 interface Slot {
   root: Element;
   cfg: Config;
@@ -73,7 +74,7 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
   const g = win as unknown as typeof globalThis;
   const selOk = selectorCheck(doc);
 
-  /** The layer that reaches resolveConfig: validated in dev, minimally sanitized otherwise. */
+  /** Validated in dev, sanitized in prod. */
   function clean(input: unknown): DeepPartial<Config> {
     if (process.env.NODE_ENV !== 'production') return validate(input, undefined, selOk);
     if (!isPlain(input)) return {};
@@ -95,12 +96,12 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
     if (!engine) {
       const cfg = resolveConfig(globalCfg());
       const eng = (engine = createEngine(host!, cfg));
-      // Sound is an optional chunk: it is only fetched when the site asks for it.
+      // sound is a lazy chunk
       if (cfg.sound) {
         const sound = cfg.sound;
         import('../audio/index')
           .then((m) => {
-            if (engine === eng) eng.use(m.createAudio(sound));
+            if (engine === eng) eng.use(m.createAudio(sound === true ? { volume: 0.7 } : sound));
           })
           .catch((err) => console.error('[curchestra]', err));
       }
@@ -112,10 +113,7 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
   const markReady = () => doc.documentElement.classList.add('cu-ready');
 
   let warnedInstance = false;
-  /**
-   * seed, theme, zIndex and agents.showNames belong to the shared canvas and RNG (R27); skipOnClick
-   * and sound are wired once per instance (safety listeners, the audio plugin).
-   */
+  /** Warn once when instance-level keys are set per call. */
   function warnInstanceLevel(layer: DeepPartial<Config>): void {
     if (process.env.NODE_ENV === 'production' || warnedInstance) return;
     const hit = ['seed', 'theme', 'zIndex', 'skipOnClick', 'sound'].find((k) => k in layer) ?? (layer.agents && 'showNames' in layer.agents ? 'agents.showNames' : '');
@@ -132,7 +130,7 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
     return resolveConfig(base, globalCfg(), call, attrs);
   }
 
-  /** Reduced motion shows content at once: no engine, canvas, stylesheet or listeners. */
+  /** Reduced motion: show content, create nothing. */
   const reduced = (cfg: Config) => cfg.reducedMotion === 'respect' && host!.reducedMotion();
 
   function startSlot(slot: Slot, mode: Mode): void {
@@ -143,14 +141,14 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
       slot.run = run;
       run.done.then(slot.settle);
     } catch (err) {
-      // The engine could not start: show whatever may be marked and never leave done pending.
+      // engine failed: show content and settle
       console.error('[curchestra]', err);
       unmarkArea(slot.root, []);
       slot.settle();
     }
   }
 
-  /** One aggregate Run over `roots`, each started by its own trigger. */
+  /** One Run over `roots`, each started by its own trigger. */
   function group(roots: Element[], mode: Mode, opts: unknown, base?: DeepPartial<Config>): Run {
     const slots: Slot[] = roots.map((root) => {
       let settle!: () => void;
@@ -159,18 +157,26 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
     });
     let observer: IntersectionObserver | null = null;
     const bySlot = new Map<Element, Slot>();
+    /** page mode: hidden sections waiting to enter the view */
+    let entry: IntersectionObserver | null = null;
+    const byEntry = new Map<Element, Slot>();
 
     const stop = () => {
       observer?.disconnect();
       observer = null;
+      entry?.disconnect();
+      entry = null;
       cleanups.delete(stop);
     };
-    /** Never-started areas were never hidden: just settle them. */
+    /** Unstarted areas are shown and settled. */
     const end = (how: 'finish' | 'cancel') => {
       stop();
       for (const s of slots) {
         if (s.run) s.run[how]();
-        else s.settle();
+        else {
+          if (!s.started) unmarkArea(s.root, []);
+          s.settle();
+        }
         s.started = true;
       }
       markReady();
@@ -185,30 +191,88 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
     };
     groups.add(run);
 
-    // Areas the observer would fire for at once start now, in this task. Every position is read
-    // before the first scan and hide, so no read follows a write.
+    // start near areas now; read every position before the first write
     const vh = host!.viewport().h;
     const nearNow = (el: Element) => {
       const r = el.getBoundingClientRect();
       return r.bottom >= -vh && r.top <= 2 * vh;
     };
+    /** on screen, or within 10% of it */
+    const seen = (el: Element) => {
+      const r = el.getBoundingClientRect();
+      return r.bottom >= -0.1 * vh && r.top <= 1.1 * vh;
+    };
+    const staged = mode === 'page' && typeof g.IntersectionObserver !== 'undefined';
+    /** Start now, or in page mode hide now and start on entering the view (so its failsafe starts then). */
+    const begin = (s: Slot, inView = seen(s.root)) => {
+      if (!staged || inView) {
+        startSlot(s, mode);
+        return;
+      }
+      getEngine().hold(s.root);
+      markReady();
+      entry ??= new g.IntersectionObserver(
+        (entries) => {
+          for (const en of entries) {
+            const t = byEntry.get(en.target);
+            if (!en.isIntersecting || !t) continue;
+            entry?.unobserve(en.target);
+            byEntry.delete(en.target);
+            startSlot(t, mode);
+          }
+        },
+        { rootMargin: '10% 0px' },
+      );
+      cleanups.add(stop);
+      byEntry.set(s.root, s);
+      entry.observe(s.root);
+    };
     const now: Slot[] = [];
     const lazy: Slot[] = [];
+    /** hidden now, built on the first scroll or after the intro */
+    const held: Slot[] = [];
+    let intro: Config['intro'] = false;
     for (const s of slots) {
       if (reduced(s.cfg)) {
         s.started = true;
         s.settle();
         continue;
       }
-      // R31: in page mode 'load' means "now if near the viewport, else as it approaches".
+      intro ||= s.cfg.intro;
+      // page 'load' = in-view
       const trigger = mode === 'page' && s.cfg.trigger === 'load' ? 'in-view' : s.cfg.trigger;
-      if (trigger === 'load' || (trigger === 'in-view' && nearNow(s.root))) now.push(s);
+      if (trigger === 'scroll') (nearNow(s.root) ? held : lazy).push(s);
+      else if (trigger === 'load' || (trigger === 'in-view' && nearNow(s.root))) now.push(s);
       else if (trigger === 'in-view') lazy.push(s);
     }
+    if (intro) held.push(...now.splice(0));
+    if (held.length || intro) {
+      const eng = getEngine();
+      markReady();
+      for (const s of held) eng.hold(s.root);
+      const byScroll = held.some((s) => s.cfg.trigger === 'scroll');
+      const evs = ['wheel', 'touchmove', 'keydown', 'pointerdown', 'scroll'];
+      let timer = 0;
+      const off = () => {
+        for (const e of evs) win.removeEventListener(e, go, true);
+        win.clearTimeout(timer);
+        cleanups.delete(off);
+      };
+      const go = () => {
+        off();
+        for (const s of held) begin(s);
+      };
+      for (const e of evs) win.addEventListener(e, go, { capture: true, passive: true });
+      if (intro) eng.intro(typeof intro === 'string' ? resolveTarget(intro) : null, go);
+      // no scroll: start after the failsafe (or INTRO_MS for an intro)
+      timer = win.setTimeout(go, byScroll ? (held[0]?.cfg.failsafe ?? 15000) : INTRO_MS);
+      cleanups.add(off);
+    }
     const started = now.length > 0;
-    // R30: cu-ready first, so preload.css is not hiding what the scanner measures (same task, no paint).
+    // cu-ready first so preload.css does not hide what the scanner measures
     if (started) markReady();
-    for (const s of now) startSlot(s, mode);
+    const inView = now.map((s) => seen(s.root));
+    now.forEach((s, i) => begin(s, inView[i]));
     if (lazy.length) {
       if (typeof g.IntersectionObserver === 'undefined') {
         markReady();
@@ -222,7 +286,7 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
               observer?.unobserve(en.target);
               bySlot.delete(en.target);
               markReady();
-              startSlot(s, mode);
+              begin(s);
             }
           },
           { rootMargin: '100% 0px' },
@@ -234,7 +298,7 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
         }
       }
     }
-    // Nothing will be hidden until a trigger fires (manual only): do not keep preload.css hiding it.
+    // manual only: nothing is hidden yet
     if (!started && lazy.length === 0) markReady();
     return run;
   }
@@ -256,7 +320,7 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
     }
   }
 
-  /** Reveal whatever the engine hid under `root` after a failed transition. */
+  /** Show what was hidden under `root` after a failed transition. */
   const reveal = (run: Run | null) => run?.cancel();
 
   const api: Curchestra = {
@@ -295,7 +359,7 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
         await update();
         return;
       }
-      /** The selector may now match a new element; an Element root is kept. */
+      /** A selector may match a new element after the update. */
       const current = () => {
         if (typeof rootOpt === 'string' && !root.isConnected) return resolveTarget(rootOpt) ?? doc.body;
         return root;
@@ -322,7 +386,7 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
         try {
           await vt.finished;
         } catch {
-          // A failed update is reported below; anything else just means no animation.
+          // a failed update is reported below
         }
         if (failure) {
           reveal(run);

@@ -50,7 +50,7 @@ export function scan(host: Host, root: Element, opts: { skip: string[]; maxTasks
   const pieces: Piece[] = [];
   if (opts.maxTasks <= 0) return pieces;
 
-  // Manual stack of [element, nearest ancestor piece id]; children pushed reversed for preorder.
+  // stack of [element, parent piece id], preorder
   const els: Element[] = [];
   const parents: (number | null)[] = [];
   const pushChildren = (el: Element, parent: number | null) => {
@@ -77,6 +77,8 @@ export function scan(host: Host, root: Element, opts: { skip: string[]; maxTasks
     const hasBgImage = bgImage !== 'none';
     let kind: PieceKind | null = null;
     let textLen = 0;
+    let fontPx: number | undefined;
+    let boxed = false;
 
     if (MEDIA_TAGS.has(el.localName) || el.shadowRoot) {
       kind = 'media';
@@ -85,6 +87,9 @@ export function scan(host: Host, root: Element, opts: { skip: string[]; maxTasks
     } else if (hasDirectText(el) && !hasBlockChild(el, win)) {
       kind = 'text';
       textLen = (el.textContent || '').trim().length;
+      fontPx = parseFloat(cs.fontSize) || undefined;
+      boxed = hasBgImage || alphaOf(cs.backgroundColor) > 0 ||
+        (parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle !== 'none' && alphaOf(cs.borderTopColor) > 0);
     } else if (hasBgImage || alphaOf(cs.backgroundColor) > 0) {
       kind = 'box';
     } else if (
@@ -111,6 +116,8 @@ export function scan(host: Host, root: Element, opts: { skip: string[]; maxTasks
       sig: el.localName + '.' + [...el.classList].sort().join('.'),
       textLen,
       rtl: cs.direction === 'rtl',
+      fs: fontPx,
+      ...(boxed ? { boxed } : {}),
     });
     if (pieces.length >= opts.maxTasks) break;
     if (kind === 'box' || kind === 'line') pushChildren(el, id);

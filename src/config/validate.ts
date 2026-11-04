@@ -7,6 +7,7 @@ type Rule =
   | { t: 'enum'; values: readonly string[] }
   | { t: 'strs' }
   | { t: 'sound' }
+  | { t: 'intro' }
   | { t: 'obj'; shape: Record<string, Rule> };
 
 const SCHEMA: Record<string, Rule> = {
@@ -22,7 +23,7 @@ const SCHEMA: Record<string, Rule> = {
     },
   },
   speed: { t: 'num', min: 0.0001 },
-  trigger: { t: 'enum', values: ['load', 'in-view', 'manual'] },
+  trigger: { t: 'enum', values: ['load', 'in-view', 'manual', 'scroll'] },
   persist: { t: 'bool' },
   idle: {
     t: 'obj',
@@ -41,9 +42,13 @@ const SCHEMA: Record<string, Rule> = {
       pen: { t: 'bool' },
       sizeBadge: { t: 'bool' },
       typing: { t: 'bool' },
+      rulers: { t: 'bool' },
+      snap: { t: 'bool' },
+      grow: { t: 'bool' },
     },
   },
   sound: { t: 'sound' },
+  intro: { t: 'intro' },
   theme: { t: 'enum', values: ['auto', 'light', 'dark'] },
   reducedMotion: { t: 'enum', values: ['respect', 'ignore'] },
   skipOnClick: { t: 'bool' },
@@ -76,19 +81,18 @@ function check(rule: Rule, v: unknown): string | null {
     case 'strs':
       return Array.isArray(v) && v.every((s) => typeof s === 'string') ? null : 'must be an array of strings';
     case 'sound':
-      if (v === false) return null;
+      if (typeof v === 'boolean') return null;
       return isPlain(v) && typeof v.volume === 'number' && v.volume >= 0 && v.volume <= 1
         ? null
-        : 'must be false or { volume: 0..1 }';
+        : 'must be true, false or { volume: 0..1 }';
+    case 'intro':
+      return typeof v === 'boolean' || (typeof v === 'string' && v.length > 0) ? null : 'must be a boolean or a selector';
     default:
       return null;
   }
 }
 
-/**
- * Drop unknown keys and invalid values, calling `warn` once per problem.
- * With `isSelector`, `skip` entries it rejects are dropped with a warning.
- */
+/** Drop unknown keys and invalid values, warning once each. */
 export function validate(
   input: unknown,
   warn: (msg: string) => void = (m) => console.warn(m),

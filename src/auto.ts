@@ -12,14 +12,14 @@ const script = typeof document !== 'undefined' ? document.currentScript : null;
 function boot(): void {
   const mode = script?.getAttribute('data-curchestra');
   if (mode !== 'page' && mode !== 'section') {
-    // Nothing will build: do not leave preload.css hiding the content until the failsafe.
+    // nothing will build: unhide now
     document.documentElement.classList.add('cu-ready');
     return;
   }
   const preset = script!.getAttribute('data-preset');
-  const swarm = curchestra(preset ? { preset: preset as 'calm' | 'default' | 'frenzy' } : undefined);
-  if (mode === 'page') swarm.page();
-  else document.querySelectorAll('[data-cu-section]').forEach((el) => swarm.section(el));
+  const orchestra = curchestra(preset ? { preset: preset as 'calm' | 'default' | 'frenzy' } : undefined);
+  if (mode === 'page') orchestra.page();
+  else document.querySelectorAll('[data-cu-section]').forEach((el) => orchestra.section(el));
 }
 
 if (typeof window !== 'undefined') {
@@ -28,5 +28,5 @@ if (typeof window !== 'undefined') {
   else boot();
 }
 
-// The IIFE's globalName assigns these exports to window.Curchestra when the script finishes.
+// exposed as window.Curchestra
 export { curchestra };

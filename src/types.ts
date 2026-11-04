@@ -18,7 +18,8 @@ export interface Config {
     showNames: boolean;
   };
   speed: number;
-  trigger: 'load' | 'in-view' | 'manual';
+  /** 'scroll': hidden at once, built on the first scroll */
+  trigger: 'load' | 'in-view' | 'manual' | 'scroll';
   persist: boolean;
   idle: {
     behavior: 'orbit' | 'flock' | 'wander' | 'leave' | 'hide';
@@ -26,8 +27,23 @@ export interface Config {
     radius: number;
     noPointer: 'wander' | 'last-touch' | 'stay';
   };
-  effects: { guides: boolean; duplicate: boolean; pen: boolean; sizeBadge: boolean; typing: boolean };
-  sound: false | { volume: number };
+  effects: {
+    guides: boolean;
+    duplicate: boolean;
+    pen: boolean;
+    sizeBadge: boolean;
+    typing: boolean;
+    /** rulers while work is on screen */
+    rulers: boolean;
+    /** text snaps onto its guide */
+    snap: boolean;
+    /** headings grow to size */
+    grow: boolean;
+  };
+  /** true = default volume */
+  sound: boolean | { volume: number };
+  /** element to circle before the build (true = page center) */
+  intro: boolean | string;
   theme: 'auto' | 'light' | 'dark';
   reducedMotion: 'respect' | 'ignore';
   skipOnClick: boolean;
@@ -59,6 +75,10 @@ export interface Piece {
   sig: string;
   textLen: number;
   rtl: boolean;
+  /** computed font size in px (text pieces) */
+  fs?: number;
+  /** text with its own background or border */
+  boxed?: boolean;
 }
 
 export type TaskType = 'box' | 'text' | 'media' | 'line' | 'dup' | 'guide';
@@ -84,8 +104,8 @@ export interface TaskGraph {
 
 export interface Scheduler {
   add(ids: number[]): void;
-  /** removes the chosen task from the queue and sets its state to 'active' */
-  pick(cursorDocY: number, viewTop: number, viewBot: number): number | null;
+  /** Takes the next task off the queue; never one below `limit` (document y). */
+  pick(cursorDocY: number, viewTop: number, viewBot: number, limit?: number): number | null;
   size(): number;
   /** queued tasks in bands overlapping [viewTop - margin, viewBot + margin] */
   inRange(viewTop: number, viewBot: number, margin: number): number;
@@ -123,10 +143,12 @@ export type RevealOp =
   | { op: 'hide'; el: Element }
   | { op: 'show'; el: Element }
   | { op: 'fade'; el: Element; ms: number }
-  | { op: 'clip'; el: Element; lines: Rect[]; progress: number; rtl: boolean; elRect?: Rect }
-  | { op: 'unclip'; el: Element };
+  | { op: 'clip'; el: Element; lines: Rect[]; progress: number; rtl: boolean; elRect?: Rect; box?: boolean }
+  | { op: 'unclip'; el: Element }
+  /** move/scale the element; 0, 0, 1 clears it */
+  | { op: 'xform'; el: Element; dx: number; dy: number; s: number };
 
-export type CursorShape = 'arrow' | 'cross' | 'ibeam' | 'pen' | 'dup';
+export type CursorShape = 'arrow' | 'cross' | 'ibeam' | 'pen' | 'pen-add' | 'dup' | 'ew' | 'ns';
 
 export interface Cursor {
   id: number;
@@ -140,6 +162,8 @@ export interface Cursor {
   shape: CursorShape;
   /** 0..1 */
   press: number;
+  /** degrees; 0 = upright */
+  angle: number;
   task: number | null;
   phase: 'enter' | 'travel' | 'work' | 'idle' | 'leave' | 'hidden';
   idleFor: number;
@@ -147,18 +171,40 @@ export interface Cursor {
   alpha: number;
 }
 
+/** Overlay drawn on the stage, viewport coords. */
 export type Deco =
-  | { t: 'outline'; r: Rect; color: string }
-  | { t: 'badge'; x: number; y: number; text: string; color: string }
+  /** selection box */
+  | { t: 'sel'; r: Rect; red?: boolean; handles?: boolean; badge?: string; rulerLines?: boolean }
+  /** spacing between two boxes */
+  | { t: 'measure'; a: Pt; b: Pt; label: string }
+  /** pen path; `tail` is the live end */
+  | { t: 'pen'; pts: Pt[]; tail?: Pt; closed?: boolean }
+  /** text selection highlight */
+  | { t: 'hilite'; r: Rect }
   | { t: 'caret'; x: number; y: number; h: number; color: string }
-  | { t: 'guide'; x: number; color: string }
-  | { t: 'path'; pts: Pt[]; color: string }
-  | { t: 'ghost'; r: Rect; color: string }
+  /** guide line; `flash` glows on snap, `drag` marks the ruler */
+  | { t: 'guide'; x: number; color: string; flash?: number; drag?: boolean; label?: number }
+  /** gray image placeholder */
   | { t: 'media'; r: Rect };
 
+/** Something a cursor just did, for sound. */
+export type Fx =
+  | { k: 'press' }
+  | { k: 'key'; n: number; space: boolean }
+  | { k: 'place'; kind: 'box' | 'media' | 'text' | 'line' | 'dup' | 'guide'; r: Rect }
+  | { k: 'snap' }
+  | { k: 'grow'; step: number };
+
+/** Rulers: `t` slides them in (0..1). */
+export interface RulerState {
+  t: number;
+  sx: number;
+  sy: number;
+}
+
 export interface Stage {
-  /** `vp` is the viewport read in the frame's read phase: draw itself reads no layout. */
-  draw(cursors: Cursor[], decos: Deco[], showNames: boolean, vp: { w: number; h: number }): void;
+  /** Draws without reading layout. */
+  draw(cursors: Cursor[], decos: Deco[], showNames: boolean, vp: { w: number; h: number }, rulers?: RulerState): void;
   resize(): void;
   destroy(): void;
   el: HTMLCanvasElement;
@@ -175,16 +221,24 @@ export interface Run {
 export type EngineEvent = 'complete' | 'section:done' | 'idle' | 'task';
 
 export interface EnginePlugin {
-  onTask?(type: TaskType, xNorm: number): void;
-  onKey?(xNorm: number): void;
+  /** A cursor did something; `at` is its viewport position. */
+  onFx?(fx: Fx, at: Pt, vp: { w: number; h: number }): void;
+  /** The intro begins. */
+  onIntro?(): void;
+  /** The first cursor reaches its first job. */
+  onStart?(): void;
   onComplete?(): void;
-  /** Called on the first pointerdown/keydown (a user gesture), or at once if that already happened. */
+  /** Called on the first user gesture. */
   unlock?(): void;
   destroy?(): void;
 }
 
 export interface Engine {
   addArea(root: Element, cfg: Config, mode: Mode): Run;
+  /** Hide `root` now; a later addArea(root) builds it. */
+  hold(root: Element): void;
+  /** Ring around `target` (null = center) until the first area starts; `poke` runs when the pointer bumps it. */
+  intro(target: Element | null, poke?: () => void): void;
   areaFor(el: Element): Run | null;
   pause(): void;
   resume(): void;
@@ -192,16 +246,18 @@ export interface Engine {
   destroy(): void;
   on(e: EngineEvent, fn: (payload?: unknown) => void): () => void;
   use(plugin: EnginePlugin): void;
-  /** @internal testing hook: the next frame throws, exercising error recovery */
+  /** @internal the next frame throws (tests) */
   __failNextFrame(): void;
-  /** @internal mark waiting tasks whose elements left the DOM as done, silently (R21) */
+  /** @internal finish tasks whose elements left the DOM */
   __prune(root: Element): void;
   stats(): {
     /** last 120 frame script times, ms */
     frameMs: number[];
     /** decos drawn in the last frame */
     decos: Deco[];
-    /** @internal snapshot of the live crew, for tests and inspection only (R20) */
-    cursors: Pick<Cursor, 'id' | 'name' | 'x' | 'y' | 'phase' | 'alpha'>[];
+    /** @internal live crew snapshot (tests) */
+    cursors: Pick<Cursor, 'id' | 'name' | 'x' | 'y' | 'phase' | 'alpha' | 'shape' | 'angle'>[];
+    /** @internal how far the rulers are slid in, 0..1 */
+    rulers: number;
   };
 }

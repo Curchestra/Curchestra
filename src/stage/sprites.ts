@@ -1,8 +1,8 @@
 import type { CursorShape, Pt } from '../types';
 
-/** Cursor shapes live on a 24-unit grid; sprites render that grid at SPRITE_PX CSS px. */
+/** Shapes use a 24-unit grid drawn at SPRITE_PX. */
 export const GRID = 24;
-export const SPRITE_PX = 28;
+export const SPRITE_PX = 22;
 export const SPRITE_SCALE = SPRITE_PX / GRID;
 const OUTLINE = 1.5;
 
@@ -22,12 +22,26 @@ function arrow(ox: number, oy: number, s: number): number[] {
   return out;
 }
 
+/** Horizontal double arrow (resize); `rot` turns it 90° for the vertical one. */
+function double(rot: boolean): number[] {
+  const h = [2.5, 12, 7, 7.5, 7, 10.4, 17, 10.4, 17, 7.5, 21.5, 12, 17, 16.5, 17, 13.6, 7, 13.6, 7, 16.5];
+  if (!rot) return h;
+  const out: number[] = [];
+  for (let i = 0; i < h.length; i += 2) out.push(24 - h[i + 1], h[i]);
+  return out;
+}
+
+const PEN = [3, 21, 5, 13.5, 15.5, 3, 21, 8.5, 10.5, 19];
+
 const hots: Record<CursorShape, Pt> = {
   arrow: { x: 3, y: 2 },
   cross: { x: 12, y: 12 },
   ibeam: { x: 12, y: 12 },
   pen: { x: 3, y: 21 },
+  'pen-add': { x: 3, y: 21 },
   dup: { x: 2, y: 2 },
+  ew: { x: 12, y: 12 },
+  ns: { x: 12, y: 12 },
 };
 
 export function hotOf(shape: CursorShape): Pt {
@@ -54,7 +68,11 @@ function buildPath(shape: CursorShape): Path2D {
     case 'ibeam':
       return poly([7, 3, 17, 3, 17, 5, 13, 5, 13, 19, 17, 19, 17, 21, 7, 21, 7, 19, 11, 19, 11, 5, 7, 5]);
     case 'pen':
-      return poly([3, 21, 5, 13.5, 15.5, 3, 21, 8.5, 10.5, 19]);
+    case 'pen-add':
+      return poly(PEN);
+    case 'ew':
+    case 'ns':
+      return poly(double(shape === 'ns'));
     case 'dup': {
       const p = new Path2D();
       p.addPath(poly(arrow(7.5, 7.5, 0.75)));
@@ -83,11 +101,27 @@ export function getSprite(shape: CursorShape, color: string, dpr: number, doc?: 
   ctx.setTransform(dpr * k, 0, 0, dpr * k, 0, 0);
   const { path } = cursorPath(shape);
   ctx.lineJoin = 'round';
+  // outline and shadow, then the body
+  ctx.shadowColor = 'rgba(0,0,0,.28)';
+  ctx.shadowBlur = 2 * dpr;
+  ctx.shadowOffsetY = 0.6 * dpr;
   ctx.lineWidth = (OUTLINE * 2) / k; // outer half of a centered stroke is OUTLINE css px
   ctx.strokeStyle = '#fff';
   ctx.stroke(path);
+  ctx.shadowColor = 'transparent';
   ctx.fillStyle = color;
   ctx.fill(path);
+  if (shape === 'pen-add') {
+    // pen "add point" plus
+    const plus = new Path2D('M19 15.5 V22.5 M15.5 19 H22.5');
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 3.2;
+    ctx.strokeStyle = '#fff';
+    ctx.stroke(plus);
+    ctx.lineWidth = 1.3;
+    ctx.strokeStyle = '#1E1E1E';
+    ctx.stroke(plus);
+  }
   cache.set(key, cv);
   return cv;
 }

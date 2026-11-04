@@ -52,11 +52,11 @@ test.describe('api', () => {
     await page.evaluate(() => {
       const w = window as any;
       w.tasksIn8 = 0;
-      const swarm = w.curchestra({ seed: 1, speed: 8, failsafe: 800 });
-      swarm.on('task', (p: any) => {
+      const orchestra = w.curchestra({ seed: 1, speed: 8, failsafe: 800 });
+      orchestra.on('task', (p: any) => {
         if (p?.el?.closest('#s8')) w.tasksIn8++;
       });
-      swarm.page();
+      orchestra.page();
     });
     await page.waitForTimeout(1200);
     await page.evaluate(() => document.querySelector('#s8')!.scrollIntoView());
@@ -66,8 +66,8 @@ test.describe('api', () => {
   test('after the build the page is left as it was: no data-cu, no stylesheet, site CSS applies again (R32)', async ({ page }) => {
     await open(page, 'spa.html');
     const r = await page.evaluate(async () => {
-      const swarm = (window as any).curchestra({ seed: 1, speed: 12 });
-      await swarm.section('#view-a', { trigger: 'load' }).done;
+      const orchestra = (window as any).curchestra({ seed: 1, speed: 12 });
+      await orchestra.section('#view-a', { trigger: 'load' }).done;
       const p = document.querySelector('#view-a p') as HTMLElement;
       p.style.visibility = 'hidden';
       return {
@@ -94,12 +94,12 @@ test.describe('api', () => {
     await open(page, 'spa.html');
     const r = await page.evaluate(async () => {
       const w = window as any;
-      const swarm = w.curchestra({ seed: 1, speed: 8 });
+      const orchestra = w.curchestra({ seed: 1, speed: 8 });
       let hiddenDuring = -1;
-      swarm.on('task', () => {
+      orchestra.on('task', () => {
         if (hiddenDuring < 0) hiddenDuring = document.querySelectorAll('[data-cu="h"]').length;
       });
-      await swarm.transition(() => w.swap(), { root: '#app' });
+      await orchestra.transition(() => w.swap(), { root: '#app' });
       return {
         swaps: w.swapCount,
         hiddenDuring,
@@ -120,8 +120,8 @@ test.describe('api', () => {
     const r = await page.evaluate(async () => {
       const w = window as any;
       (document as any).startViewTransition = undefined;
-      const swarm = w.curchestra({ seed: 1, speed: 8 });
-      await swarm.transition(() => w.swap(), { root: '#app' });
+      const orchestra = w.curchestra({ seed: 1, speed: 8 });
+      await orchestra.transition(() => w.swap(), { root: '#app' });
       const app = document.querySelector('#app') as HTMLElement;
       return {
         swaps: w.swapCount,
@@ -136,10 +136,10 @@ test.describe('api', () => {
   test('transition: an update() that throws reveals and rethrows', async ({ page }) => {
     await open(page, 'spa.html');
     const r = await page.evaluate(async () => {
-      const swarm = (window as any).curchestra({ seed: 1, speed: 8 });
+      const orchestra = (window as any).curchestra({ seed: 1, speed: 8 });
       let msg = '';
       try {
-        await swarm.transition(
+        await orchestra.transition(
           () => {
             throw new Error('nope');
           },
@@ -171,22 +171,23 @@ test.describe('api', () => {
 
   test('page() twice returns the same Run and does no duplicate work; section() during page() reuses the area', async ({ page }) => {
     test.setTimeout(60_000);
-    // Tall enough that every section is near the viewport and starts at once (R31).
+    // Tall, and scrolled through once, so every section is reached (a page is built as it is seen).
     await page.setViewportSize({ width: 1280, height: 2000 });
     const run = async (twice: boolean) => {
       await open(page, 'landing.html');
       return page.evaluate(async (again) => {
-        const swarm = (window as any).curchestra({ seed: 1, speed: 12 });
+        const orchestra = (window as any).curchestra({ seed: 1, speed: 12 });
         let tasks = 0;
-        swarm.on('task', () => tasks++);
-        const first = swarm.page();
+        orchestra.on('task', () => tasks++);
+        const first = orchestra.page();
         let same = true;
         let sectionSame = true;
         if (again) {
-          same = swarm.page() === first;
-          const a = swarm.section('#cards');
-          sectionSame = a === swarm.section('#cards') && a !== first;
+          same = orchestra.page() === first;
+          const a = orchestra.section('#cards');
+          sectionSame = a === orchestra.section('#cards') && a !== first;
         }
+        window.scrollTo(0, document.documentElement.scrollHeight);
         await first.done;
         return { same, sectionSame, tasks };
       }, twice);
@@ -202,8 +203,8 @@ test.describe('api', () => {
   test('finish() reveals not-yet-added in-view areas and resolves done', async ({ page }) => {
     await open(page, 'long.html');
     const r = await page.evaluate(async () => {
-      const swarm = (window as any).curchestra({ seed: 1, trigger: 'in-view' });
-      const run = swarm.page();
+      const orchestra = (window as any).curchestra({ seed: 1, trigger: 'in-view' });
+      const run = orchestra.page();
       await new Promise((res) => setTimeout(res, 100));
       run.finish();
       await run.done;
@@ -223,14 +224,14 @@ test.describe('fix round 1', () => {
   test('page() after its Run completed returns that Run and does not rebuild', async ({ page }) => {
     await open(page, 'spa.html');
     const r = await page.evaluate(async () => {
-      const swarm = (window as any).curchestra({ seed: 1, speed: 12 });
-      const first = swarm.page();
+      const orchestra = (window as any).curchestra({ seed: 1, speed: 12 });
+      const first = orchestra.page();
       await first.done;
       let rehidden = 0;
       new MutationObserver((recs) => {
         for (const rec of recs) if ((rec.target as Element).getAttribute('data-cu') === 'h') rehidden++;
       }).observe(document.body, { attributes: true, subtree: true, attributeFilter: ['data-cu'] });
-      const again = swarm.page();
+      const again = orchestra.page();
       await new Promise((res) => setTimeout(res, 100));
       return { same: again === first, rehidden, left: document.querySelectorAll('[data-cu="h"]').length };
     });
@@ -298,9 +299,9 @@ test.describe('fix round 1', () => {
     const warnings: string[] = [];
     page.on('console', (m) => m.type() === 'warning' && warnings.push(m.text()));
     await page.evaluate(() => {
-      const swarm = (window as any).curchestra({ seed: 1, speed: 12 });
-      swarm.section('#view-a', { seed: 5, trigger: 'load' });
-      swarm.section('#app', { theme: 'dark', trigger: 'manual' });
+      const orchestra = (window as any).curchestra({ seed: 1, speed: 12 });
+      orchestra.section('#view-a', { seed: 5, trigger: 'load' });
+      orchestra.section('#app', { theme: 'dark', trigger: 'manual' });
     });
     expect(warnings.filter((w) => w.includes('seed') || w.includes('theme'))).toHaveLength(1);
   });

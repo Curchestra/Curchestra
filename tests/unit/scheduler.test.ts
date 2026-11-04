@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createScheduler } from '../../src/scheduler/buckets';
-import { crewTarget } from '../../src/scheduler/crew';
+import { crewTarget, tempoFor } from '../../src/scheduler/crew';
 import type { Task, TaskGraph, TaskType } from '../../src/types';
 
 function graphOf(specs: Array<[number, TaskType?]>): TaskGraph {
@@ -30,19 +30,32 @@ describe('scheduler', () => {
     expect(s.size()).toBe(0);
   });
 
-  it('picks the nearest band first', () => {
+  it('on screen builds top-down, leaning toward the cursor', () => {
     const g = graphOf([[50], [250], [450]]);
     const s = createScheduler(g, 100);
     s.add(ids(g));
+    expect(s.pick(260, 0, 1000)).toBe(0); // 50*0.6 + 210*0.4 = 114 beats 150 + 4 = 154
     expect(s.pick(260, 0, 1000)).toBe(1);
-    expect(s.pick(260, 0, 1000)).toBe(2); // bands 0 and 4 tie at d=2; y=450 is nearer
+    expect(s.pick(260, 0, 1000)).toBe(2);
   });
 
-  it('searches both sides at equal distance, then picks by priority', () => {
-    const g = graphOf([[150], [350]]);
+  it('on screen stays top-down even with the cursor right next to a lower piece', () => {
+    const g = graphOf([[300], [340]]);
     const s = createScheduler(g, 100);
     s.add(ids(g));
-    expect(s.pick(260, 0, 1000)).toBe(1); // bands 1 and 3 tie at d=1; y=350 is nearer
+    expect(s.pick(340, 0, 1000)).toBe(0);
+  });
+
+  it('nothing below the frontier (the furthest the visitor has seen) is picked', () => {
+    const g = graphOf([[100], [900], [1500]]);
+    const s = createScheduler(g, 100);
+    s.add(ids(g));
+    expect(s.pick(100, 0, 800, 800)).toBe(0);
+    expect(s.pick(100, 0, 800, 800)).toBeNull();
+    // scrolled to 600..1400 then back up: 900 was seen, 1500 still was not
+    expect(s.pick(100, 0, 800, 1400)).toBe(1);
+    expect(s.pick(100, 0, 800, 1400)).toBeNull();
+    expect(s.size()).toBe(1);
   });
 
   it('guide beats a closer box in the same band', () => {
@@ -82,20 +95,31 @@ describe('scheduler', () => {
     expect(s.size()).toBe(4);
   });
 
-  it('handles negative y and distant cursors', () => {
+  it('work scrolled past comes before work below the view', () => {
     const g = graphOf([[-250], [5000]]);
     const s = createScheduler(g, 100);
     s.add(ids(g));
-    expect(s.pick(4000, 0, 100)).toBe(1);
     expect(s.pick(4000, 0, 100)).toBe(0);
+    expect(s.pick(4000, 0, 100)).toBe(1);
   });
 });
 
 describe('crewTarget', () => {
   it('sizes from backlog and scroll speed, clamped', () => {
-    expect(crewTarget({ min: 6, max: 30, backlogInRange: 40, scrollSpeed: 0 })).toBe(16);
-    expect(crewTarget({ min: 6, max: 30, backlogInRange: 0, scrollSpeed: 3000 })).toBe(26);
+    expect(crewTarget({ min: 6, max: 30, backlogInRange: 40, scrollSpeed: 0 })).toBe(19);
+    expect(crewTarget({ min: 6, max: 30, backlogInRange: 0, scrollSpeed: 500 })).toBe(16);
+    expect(crewTarget({ min: 6, max: 30, backlogInRange: 0, scrollSpeed: 3000 })).toBe(30);
     expect(crewTarget({ min: 6, max: 30, backlogInRange: 9999, scrollSpeed: 99999 })).toBe(30);
     expect(crewTarget({ min: 6, max: 30, backlogInRange: 0, scrollSpeed: 0 })).toBe(6);
+  });
+});
+
+describe('tempoFor', () => {
+  it('2.1 at rest, a little faster with scroll speed and work per cursor, capped at 3.2', () => {
+    expect(tempoFor(0, 0, 6)).toBe(2.1);
+    expect(tempoFor(900, 0, 6)).toBeCloseTo(2.6);
+    expect(tempoFor(0, 12, 6)).toBeCloseTo(2.7);
+    expect(tempoFor(99999, 999, 1)).toBe(3.2);
+    expect(tempoFor(0, 5, 0)).toBe(3.2); // no crew yet: never divides by zero
   });
 });

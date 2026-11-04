@@ -51,8 +51,8 @@ test('an error inside a frame reveals everything and is logged', async ({ page }
   expect(errors.some((e) => e.includes('[curchestra]'))).toBe(true);
 });
 
-test('clicking inside an unbuilt area finishes only that area, quickly', async ({ page }) => {
-  await build(page, { ...SLOW, failsafe: 60_000 }, ['#cards', '#columns']);
+test('skipOnClick: clicking inside an unbuilt area finishes only that area, quickly', async ({ page }) => {
+  await build(page, { ...SLOW, failsafe: 60_000, skipOnClick: true }, ['#cards', '#columns']);
   const box = (await page.locator('.card').first().boundingBox())!;
   const t0 = await page.evaluate(() => performance.now());
   await page.mouse.click(box.x + 20, box.y + 20);
@@ -64,12 +64,23 @@ test('clicking inside an unbuilt area finishes only that area, quickly', async (
   expect(await page.evaluate(() => document.querySelectorAll('#cards [data-cu="h"]').length)).toBe(0);
 });
 
-test('skipOnClick:false ignores clicks', async ({ page }) => {
-  await build(page, { ...SLOW, failsafe: 60_000, skipOnClick: false }, ['#cards']);
+test('by default a click does not skip the build', async ({ page }) => {
+  await build(page, { ...SLOW, failsafe: 60_000 }, ['#cards']);
   const box = (await page.locator('.card').first().boundingBox())!;
   await page.mouse.click(box.x + 20, box.y + 20);
   await page.waitForTimeout(200);
   expect(await page.evaluate(() => (window as any).finishedBy['#cards'])).toBeUndefined();
+});
+
+test('clicking a revealed link inside an unbuilt area moves focus but does not skip the build', async ({ page }) => {
+  await build(page, { seed: 1, speed: 0.3, failsafe: 60_000 });
+  await page.waitForFunction(() => !!document.querySelector('#nav a[data-cu="v"]'), null, { timeout: 15_000 });
+  const box = (await page.locator('#nav a[data-cu="v"]').first().boundingBox())!;
+  await page.evaluate(() => document.querySelector('#nav a[data-cu="v"]')!.addEventListener('click', (e) => e.preventDefault()));
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => (window as any).finishedBy['body'])).toBeUndefined();
+  expect(await hidden(page)).toBeGreaterThan(0);
 });
 
 test('focusin on an already revealed link inside an unbuilt area finishes it (programmatic focus)', async ({ page }) => {
@@ -135,6 +146,8 @@ test('elements appended mid-build are visible at complete', async ({ page }) => 
       d.textContent = `late ${i}`;
       host.appendChild(d);
     }
+    // a page is built as the visitor scrolls to it
+    window.scrollTo(0, document.documentElement.scrollHeight);
   });
   await page.waitForFunction(() => (window as any).completes === 1, null, { timeout: 20_000 });
   const r = await page.evaluate(() => ({
@@ -154,6 +167,8 @@ test('removing an unbuilt card mid-build is silent and complete still fires', as
   await page.evaluate(() => {
     document.querySelector('.card:nth-child(6)')!.remove();
     document.querySelector('#columns p:last-child')!.remove();
+    // a page is built as the visitor scrolls to it
+    window.scrollTo(0, document.documentElement.scrollHeight);
   });
   await page.waitForFunction(() => (window as any).completes === 1, null, { timeout: 20_000 });
   expect(errors).toEqual([]);
@@ -213,4 +228,20 @@ test('destroy mid text clip leaves no trace', async ({ page }) => {
   await page.evaluate(() => (window as any).eng.destroy());
   await page.waitForTimeout(200);
   await expectClean(page);
+});
+
+test('a page builds only what the visitor has seen; the failsafe still reveals the rest', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 400 });
+  await build(page, { seed: 1, speed: 4, failsafe: 4000 });
+  const below = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('[data-cu="h"]')].filter((e) => e.getBoundingClientRect().top > innerHeight).length,
+    );
+  await page.waitForTimeout(2500);
+  // nobody scrolled: work below the fold is still waiting, the page is not complete
+  expect(await below()).toBeGreaterThan(0);
+  expect(await page.evaluate(() => (window as any).completes)).toBe(0);
+  // the failsafe reveals it anyway (screen readers and crawlers never scroll)
+  await page.waitForFunction(() => (window as any).completes === 1, null, { timeout: 5000 });
+  expect(await hidden(page)).toBe(0);
 });

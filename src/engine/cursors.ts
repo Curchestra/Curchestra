@@ -1,43 +1,67 @@
 import type { Action, ActionCtx } from '../actions/index';
 import { spring } from '../motion/ease';
+import { type Arc, type Personality, arcPoint, personality, planArc } from '../motion/physics';
 import type { Config, Cursor, Pt, Rect } from '../types';
 import type { Area } from './area';
 
-/** R19: orchestra-themed default crew. */
+/** Default crew names and colors. */
 export const DEFAULT_NAMES = ['Alto', 'Bass', 'Cello', 'Drum', 'Flute', 'Harp', 'Oboe', 'Piano', 'Sax', 'Tuba', 'Viola', 'Horn'];
 export const DEFAULT_COLORS = [
   '#E5484D', '#F76B15', '#FFB224', '#30A46C', '#12A594', '#0090FF',
   '#3E63DD', '#8E4EC6', '#D6409F', '#E54666', '#46A758', '#00A2C7',
 ];
 
-/** How far outside the viewport cursors spawn and exit. */
+/** px outside the view where cursors spawn and exit */
 const SPAWN_OUT = 32;
 const EXIT_OUT = 48;
 const GONE = 30;
 const SUBSTEP = 1 / 120;
-/** seconds to fade in at a section edge */
+/** fade-in time at a section edge, s */
 const FADE_IN_S = 0.3;
-/** px before a section exit point over which a leaving cursor fades out */
+/** fade-out distance before a section exit, px */
 const FADE_OUT_PX = 48;
 
 /** Engine-side state for one cursor. */
 export interface Crew {
   c: Cursor;
-  /** area of the current task, or the last one worked in */
+  /** current or last area */
   area: Area | null;
   action: Action | null;
   ctx: ActionCtx;
-  /** seconds into the work phase */
+  /** seconds into the work */
   t: number;
-  /** action.start relative to the task rect at creation, so travel follows the live element */
+  /** start point relative to the task rect */
   off: Pt;
   /** next keystroke index (plugins) */
   key: number;
   /** where the cursor became free */
   home: Pt;
   exit: Pt | null;
-  /** leaving through a section edge, which may be on screen: fade out on the way (R33) */
+  /** fade out while leaving (section edges can be on screen) */
   fadeOut: boolean;
+  /** intro ring seat */
+  ring?: number;
+  /** how this cursor moves */
+  p: Personality;
+  /** current trip */
+  arc: Arc | null;
+  /** px/s */
+  vel: Pt;
+  /** stroll while idle during a build */
+  wander: Wander | null;
+}
+
+/** A stroll in document coords, so it scrolls with the page. */
+export interface Wander {
+  /** position, document px */
+  at: Pt;
+  /** target, document px; null while paused */
+  to: Pt | null;
+  arc: Arc | null;
+  /** pause left, s */
+  pause: number;
+  /** last viewport position it set */
+  last: Pt;
 }
 
 export function makeCrew(
@@ -62,6 +86,7 @@ export function makeCrew(
     sy: { x: at.y, v: 0 },
     shape: 'arrow',
     press: 0,
+    angle: 0,
     task: null,
     phase: 'enter',
     idleFor: 0,
@@ -77,7 +102,23 @@ export function makeCrew(
     effects,
     color,
   };
-  return { c, area: null, action: null, ctx, t: 0, off: { x: 0, y: 0 }, key: 0, home: { ...at }, exit: null, fadeOut: false };
+  return {
+    c, area: null, action: null, ctx, t: 0, off: { x: 0, y: 0 }, key: 0, home: { ...at }, exit: null, fadeOut: false,
+    p: personality(rng), arc: null, vel: { x: 0, y: 0 }, wander: null,
+  };
+}
+
+/** Fly along an arc to a live target; true on landing. */
+export function travelStep(k: Crew, to: Pt, dt: number, speed: number, rng: () => number): boolean {
+  const c = k.c;
+  if (!k.arc) k.arc = planArc(c, to, rng, speed, k.p.quick);
+  k.arc.t += dt;
+  const p = arcPoint(k.arc, to);
+  c.x = p.x;
+  c.y = p.y;
+  if (k.arc.t < k.arc.dur) return false;
+  k.arc = null;
+  return true;
 }
 
 /** A point `out` px beyond the edge of `r` nearest to `p`. */
@@ -97,14 +138,16 @@ export function edgePoint(p: Pt, r: Rect, out = SPAWN_OUT): Pt {
   return { x: cx, y: y1 + out };
 }
 
-/** R33: section areas confine entry and exit to their live rect; page and transition use the viewport. */
+/** Sections confine entry and exit to their rect; other modes use the viewport. */
 export function confineRect(area: Area | null, vp: { w: number; h: number }): Rect {
   return area?.mode === 'section' ? area.rect : { x: 0, y: 0, w: vp.w, h: vp.h };
 }
 
-/** Place a new cursor just outside the edge nearest its first task; at a section edge it fades in. */
-export function spawnAt(k: Crew, vp: { w: number; h: number }): void {
-  const at = edgePoint({ x: k.ctx.rect.x + k.off.x, y: k.ctx.rect.y + k.off.y }, confineRect(k.area, vp));
+/** Spawn off screen: left/right edge for pages, nearest section edge (fading in) for sections. */
+export function spawnAt(k: Crew, vp: { w: number; h: number }, rng: () => number): void {
+  const at = k.area?.mode === 'section'
+    ? edgePoint({ x: k.ctx.rect.x + k.off.x, y: k.ctx.rect.y + k.off.y }, confineRect(k.area, vp))
+    : { x: rng() < 0.5 ? -SPAWN_OUT : vp.w + SPAWN_OUT, y: vp.h * (0.2 + rng() * 0.6) };
   k.c.x = k.c.sx.x = at.x;
   k.c.y = k.c.sy.x = at.y;
   k.home = at;
@@ -115,14 +158,17 @@ export function fadeIn(c: Cursor, dt: number): void {
   if (c.alpha < 1) c.alpha = Math.min(1, c.alpha + dt / FADE_IN_S);
 }
 
-/** Start leaving through the nearest edge of the cursor's confinement rect. */
+/** Leave sideways for pages, through the nearest edge for sections. */
 export function sendOut(k: Crew, vp: { w: number; h: number }): void {
   k.c.phase = 'leave';
-  k.exit = edgePoint(k.c, confineRect(k.area, vp), EXIT_OUT);
+  k.wander = null;
+  k.exit = k.area?.mode === 'section'
+    ? edgePoint(k.c, confineRect(k.area, vp), EXIT_OUT)
+    : { x: k.c.x > vp.w / 2 ? vp.w + EXIT_OUT : -EXIT_OUT, y: k.c.y };
   k.fadeOut = k.area?.mode === 'section';
 }
 
-/** Move a leaving cursor toward its exit; returns true once it is gone. */
+/** Move toward the exit; true once gone. */
 export function leaveStep(k: Crew, dt: number, vp: { w: number; h: number }): boolean {
   const c = k.c;
   const e = k.exit!;
@@ -139,7 +185,7 @@ export function inside(c: Cursor, vp: { w: number; h: number }): boolean {
   return c.x >= 0 && c.y >= 0 && c.x <= vp.w && c.y <= vp.h;
 }
 
-/** Spring the cursor toward (tx, ty), substepped for stability at high speed. */
+/** Spring toward (tx, ty), substepped. */
 export function springTo(c: Cursor, tx: number, ty: number, dt: number): void {
   const n = Math.max(1, Math.ceil(dt / SUBSTEP));
   const h = dt / n;
@@ -151,7 +197,7 @@ export function springTo(c: Cursor, tx: number, ty: number, dt: number): void {
   c.y = c.sy.x;
 }
 
-/** Keep the springs on the cursor after an action moved it directly. */
+/** Sync springs after moving the cursor directly. */
 export function syncSprings(c: Cursor, dt: number): void {
   c.sx.v = dt > 0 ? (c.x - c.sx.x) / dt : 0;
   c.sy.v = dt > 0 ? (c.y - c.sy.x) / dt : 0;
