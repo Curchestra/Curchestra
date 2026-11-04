@@ -75,9 +75,17 @@ export function createEngine(host: Host, config: Config): Engine {
 
   // ---- events -------------------------------------------------------------
 
+  /** A throwing listener is logged; the others, and the caller (finish, failsafe), carry on. */
   function fire(e: EngineEvent, p?: unknown): void {
     const set = listeners.get(e);
-    if (set) for (const fn of [...set]) fn(p);
+    if (!set) return;
+    for (const fn of [...set]) {
+      try {
+        fn(p);
+      } catch (err) {
+        console.error('[curchestra]', err);
+      }
+    }
   }
   /** Inside a frame events wait until the frame's writes and draw are done. */
   function emit(e: EngineEvent, p?: unknown): void {

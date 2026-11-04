@@ -371,6 +371,34 @@ test('an inner area that ends inside a building one keeps its marks until the ou
   expect(r.end).toEqual({ attrs: 0, styles: 0 });
 });
 
+test('a throwing event listener is logged and finishAll() still reveals every area', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const cu = (window as any).cu;
+    const cfg = cu.resolveConfig({ seed: 1, speed: 0.01, failsafe: 60_000 });
+    const eng = cu.createEngine(cu.browserHost(), cfg);
+    const logged: unknown[][] = [];
+    const orig = console.error;
+    console.error = (...a: unknown[]) => void logged.push(a);
+    let completes = 0;
+    eng.on('section:done', () => {
+      throw new Error('listener boom');
+    });
+    eng.on('complete', () => completes++);
+    for (const sel of ['#hero', '#cards', '#columns']) eng.addArea(document.querySelector(sel), cfg, 'section');
+    let threw = false;
+    try {
+      eng.finishAll();
+    } catch {
+      threw = true;
+    }
+    console.error = orig;
+    const out = { threw, completes, hidden: document.querySelectorAll('[data-cu="h"]').length, tag: logged[0]?.[0] };
+    eng.destroy();
+    return out;
+  });
+  expect(r).toEqual({ threw: false, completes: 1, hidden: 0, tag: '[curchestra]' });
+});
+
 test('cancel reveals without events; finish emits section:done', async ({ page }) => {
   const r = await page.evaluate(async () => {
     const cu = (window as any).cu;
