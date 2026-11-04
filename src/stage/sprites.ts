@@ -30,43 +30,54 @@ const hots: Record<CursorShape, Pt> = {
   dup: { x: 2, y: 2 },
 };
 
+export function hotOf(shape: CursorShape): Pt {
+  return hots[shape];
+}
+
+const paths = new Map<CursorShape, Path2D>();
+
 export function cursorPath(shape: CursorShape): { path: Path2D; hot: Pt } {
-  const hot = hots[shape];
+  let path = paths.get(shape);
+  if (!path) {
+    path = buildPath(shape);
+    paths.set(shape, path);
+  }
+  return { path, hot: hots[shape] };
+}
+
+function buildPath(shape: CursorShape): Path2D {
   switch (shape) {
     case 'arrow':
-      return { path: poly(arrow(3, 2, 1)), hot };
+      return poly(arrow(3, 2, 1));
     case 'cross':
-      return {
-        path: poly([10.8, 3, 13.2, 3, 13.2, 10.8, 21, 10.8, 21, 13.2, 13.2, 13.2, 13.2, 21, 10.8, 21, 10.8, 13.2, 3, 13.2, 3, 10.8, 10.8, 10.8]),
-        hot,
-      };
+      return poly([10.8, 3, 13.2, 3, 13.2, 10.8, 21, 10.8, 21, 13.2, 13.2, 13.2, 13.2, 21, 10.8, 21, 10.8, 13.2, 3, 13.2, 3, 10.8, 10.8, 10.8]);
     case 'ibeam':
-      return {
-        path: poly([7, 3, 17, 3, 17, 5, 13, 5, 13, 19, 17, 19, 17, 21, 7, 21, 7, 19, 11, 19, 11, 5, 7, 5]),
-        hot,
-      };
+      return poly([7, 3, 17, 3, 17, 5, 13, 5, 13, 19, 17, 19, 17, 21, 7, 21, 7, 19, 11, 19, 11, 5, 7, 5]);
     case 'pen':
-      return { path: poly([3, 21, 5, 13.5, 15.5, 3, 21, 8.5, 10.5, 19]), hot };
+      return poly([3, 21, 5, 13.5, 15.5, 3, 21, 8.5, 10.5, 19]);
     case 'dup': {
       const p = new Path2D();
       p.addPath(poly(arrow(7.5, 7.5, 0.75)));
       p.addPath(poly(arrow(2, 2, 0.75)));
-      return { path: p, hot };
+      return p;
     }
   }
 }
 
 const cache = new Map<string, CanvasImageSource>();
 
-export function getSprite(shape: CursorShape, color: string, dpr: number): CanvasImageSource {
+export function getSprite(shape: CursorShape, color: string, dpr: number, doc?: Document): CanvasImageSource {
   const key = `${shape}|${color}|${dpr}`;
   const hit = cache.get(key);
   if (hit) return hit;
   const px = Math.ceil(SPRITE_PX * dpr);
-  const cv: HTMLCanvasElement | OffscreenCanvas =
-    typeof OffscreenCanvas !== 'undefined'
-      ? new OffscreenCanvas(px, px)
-      : Object.assign(document.createElement('canvas'), { width: px, height: px });
+  let cv: HTMLCanvasElement | OffscreenCanvas;
+  if (typeof OffscreenCanvas !== 'undefined') cv = new OffscreenCanvas(px, px);
+  else if (doc) {
+    cv = doc.createElement('canvas');
+    cv.width = px;
+    cv.height = px;
+  } else throw new Error('getSprite: OffscreenCanvas unavailable and no document given');
   const ctx = cv.getContext('2d') as CanvasRenderingContext2D;
   const k = SPRITE_SCALE;
   ctx.setTransform(dpr * k, 0, 0, dpr * k, 0, 0);

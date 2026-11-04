@@ -1,5 +1,5 @@
 import type { Cursor, Deco, Host, Rect, Stage } from '../types';
-import { cursorPath, getSprite, SPRITE_PX, SPRITE_SCALE } from './sprites';
+import { getSprite, hotOf, SPRITE_PX, SPRITE_SCALE } from './sprites';
 
 const PAD = 2;
 const TAG_FONT = '600 12px system-ui, sans-serif';
@@ -29,9 +29,16 @@ export function createStage(host: Host, zIndex: number, theme: 'light' | 'dark')
   }
   resize();
 
+  const widths = new Map<string, number>();
   function textWidth(font: string, text: string): number {
-    ctx.font = font;
-    return ctx.measureText(text).width;
+    const key = font + '|' + text;
+    let w = widths.get(key);
+    if (w === undefined) {
+      ctx.font = font;
+      w = ctx.measureText(text).width;
+      widths.set(key, w);
+    }
+    return w;
   }
 
   function pill(r: Rect, color: string, font: string, text: string): void {
@@ -155,7 +162,7 @@ export function createStage(host: Host, zIndex: number, theme: 'light' | 'dark')
     let cur: Rect | null = null;
     for (const d of decos) cur = union(cur, decoBounds(d, vp.h));
     for (const c of live) {
-      const { hot } = cursorPath(c.shape);
+      const hot = hotOf(c.shape);
       cur = union(cur, { x: c.x - hot.x * SPRITE_SCALE, y: c.y - hot.y * SPRITE_SCALE, w: SPRITE_PX, h: SPRITE_PX });
       if (showNames && c.name) cur = union(cur, tagRect(c));
     }
@@ -176,13 +183,13 @@ export function createStage(host: Host, zIndex: number, theme: 'light' | 'dark')
 
     for (const d of decos) drawDeco(d, vp.h);
     for (const c of live) {
-      const { hot } = cursorPath(c.shape);
+      const hot = hotOf(c.shape);
       const s = 1 - c.press * 0.12;
       ctx.save();
       ctx.globalAlpha = c.alpha;
       ctx.translate(c.x, c.y);
       ctx.scale(s, s);
-      ctx.drawImage(getSprite(c.shape, c.color, dpr), -hot.x * SPRITE_SCALE, -hot.y * SPRITE_SCALE, SPRITE_PX, SPRITE_PX);
+      ctx.drawImage(getSprite(c.shape, c.color, dpr, host.doc), -hot.x * SPRITE_SCALE, -hot.y * SPRITE_SCALE, SPRITE_PX, SPRITE_PX);
       ctx.restore();
     }
     if (showNames) {

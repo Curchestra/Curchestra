@@ -33,7 +33,7 @@ test('canvas is aria-hidden, click-through, and removed on destroy', async ({ pa
 test('getSprite is cached', async ({ page }) => {
   const same = await page.evaluate(() => {
     const cu = (window as any).cu;
-    return cu.getSprite('arrow', '#F24E1E', 2) === cu.getSprite('arrow', '#F24E1E', 2);
+    return cu.getSprite('arrow', '#F24E1E', 2, document) === cu.getSprite('arrow', '#F24E1E', 2, document);
   });
   expect(same).toBe(true);
 });
@@ -107,4 +107,29 @@ test('hidden cursors and all deco kinds draw without error', async ({ page }) =>
   expect(r.hiddenCursor).toBe(0);
   expect(r.media).toBeGreaterThan(0);
   expect(r.guide).toBeGreaterThan(0);
+});
+
+test('dirty rect: moving a cursor clears the old position', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const cu = (window as any).cu;
+    const s = cu.createStage(cu.browserHost(), 99, 'light');
+    const a = (x: number, y: number) => {
+      const d = window.devicePixelRatio || 1;
+      return s.el.getContext('2d').getImageData(Math.round(x * d), Math.round(y * d), 1, 1).data[3];
+    };
+    const c = {
+      id: 1, name: 'Ada', color: '#F24E1E', x: 100, y: 100,
+      sx: { x: 0, v: 0 }, sy: { x: 0, v: 0 },
+      shape: 'arrow', press: 0, task: null, phase: 'idle', idleFor: 0, seedPhase: 0, alpha: 1,
+    };
+    s.draw([c], [], false);
+    const atA1 = a(103, 103);
+    s.draw([{ ...c, x: 400, y: 300 }], [], false);
+    const out = { atA1, atA: a(103, 103), atB: a(403, 303) };
+    s.destroy();
+    return out;
+  });
+  expect(r.atA1).toBeGreaterThan(0);
+  expect(r.atA).toBe(0);
+  expect(r.atB).toBeGreaterThan(0);
 });
