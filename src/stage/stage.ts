@@ -13,7 +13,7 @@ const NEUTRAL = {
 export function createStage(host: Host, zIndex: number, theme: 'light' | 'dark'): Stage {
   const el = host.doc.createElement('canvas');
   el.setAttribute('aria-hidden', 'true');
-  el.style.cssText = `position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:${zIndex}`;
+  el.style.cssText = `position:fixed;left:0;top:0;pointer-events:none;z-index:${zIndex}`;
   host.doc.documentElement.appendChild(el);
   const ctx = el.getContext('2d') as CanvasRenderingContext2D;
   let dpr = 1;
@@ -22,6 +22,9 @@ export function createStage(host: Host, zIndex: number, theme: 'light' | 'dark')
   function resize(): void {
     const vp = host.viewport();
     dpr = host.dpr();
+    // The CSS box must match the backing store: 100vw/100vh would include classic scrollbars.
+    el.style.width = `${vp.w}px`;
+    el.style.height = `${vp.h}px`;
     el.width = Math.max(1, Math.round(vp.w * dpr));
     el.height = Math.max(1, Math.round(vp.h * dpr));
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
