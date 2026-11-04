@@ -37,3 +37,47 @@ export interface Config {
   failsafe: number;
   zIndex: number;
 }
+
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export type PieceKind = 'box' | 'text' | 'media' | 'line';
+
+export interface Piece {
+  id: number;
+  el: Element;
+  kind: PieceKind;
+  /** document coords at scan */
+  rect: Rect;
+  /** nearest ancestor piece */
+  parent: number | null;
+  /** tag+class signature */
+  sig: string;
+  textLen: number;
+  rtl: boolean;
+}
+
+export type TaskType = 'box' | 'text' | 'media' | 'line' | 'dup' | 'guide';
+
+export interface Task {
+  id: number;
+  type: TaskType;
+  piece: number | null;
+  y: number;
+  x: number;
+  deps: number[];
+  dependents: number[];
+  pending: number;
+  state: 'wait' | 'ready' | 'active' | 'done';
+  /** dup: original task id */
+  original?: number;
+}
+
+export interface TaskGraph {
+  tasks: Task[];
+  pieceTask: Map<number, number>;
+}
