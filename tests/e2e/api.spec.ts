@@ -193,26 +193,39 @@ test.describe('fix round 1', () => {
     expect(r).toEqual({ same: true, rehidden: 0, left: 0 });
   });
 
-  test('mixed triggers: an in-view area within a viewport is hidden before cu-ready is set', async ({ page }) => {
+  test('mixed triggers: an in-view area within a viewport is hidden in the same task as cu-ready, after it (R30)', async ({ page }) => {
     await open(page, 'long.html');
-    const order = await page.evaluate(async () => {
+    const order = await page.evaluate(() => {
       document.querySelector('#s0')!.setAttribute('data-cu-trigger', 'load');
       const s1 = document.querySelector('#s1')!;
-      const log: string[] = [];
-      const mo = new MutationObserver((recs) => {
-        for (const rec of recs) {
-          if (rec.target === s1) log.push('s1-hidden');
-          else log.push('ready');
-        }
-      });
+      const mo = new MutationObserver(() => {});
       mo.observe(s1, { attributes: true, attributeFilter: ['data-cu'] });
       mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-      (window as any).curchestra({ seed: 1, trigger: 'in-view' }).page().finish();
-      await new Promise((res) => setTimeout(res, 50));
+      const run = (window as any).curchestra({ seed: 1, trigger: 'in-view' }).page();
+      // Taken synchronously: both writes happened inside the page() call.
+      const log = mo.takeRecords().map((r) => (r.target === s1 ? 's1-hidden' : 'ready'));
+      run.finish();
       return log;
     });
-    expect(order[0]).toBe('s1-hidden');
-    expect(order).toContain('ready');
+    expect(order.slice(0, 2)).toEqual(['ready', 's1-hidden']);
+  });
+
+  test('page() reads every section position before it hides anything', async ({ page }) => {
+    await open(page, 'long.html');
+    const marked = await page.evaluate(() => {
+      const s3 = document.querySelector('#s3')!;
+      const orig = Element.prototype.getBoundingClientRect;
+      let first: boolean | null = null;
+      Element.prototype.getBoundingClientRect = function (this: Element) {
+        if (this === s3 && first === null) first = document.querySelector('[data-cu]') !== null;
+        return orig.call(this);
+      };
+      (window as any).curchestra({ seed: 1, trigger: 'in-view' }).page();
+      Element.prototype.getBoundingClientRect = orig;
+      return first;
+    });
+    // Reading #s3 after another section was marked would force a style recalc mid-task.
+    expect(marked).toBe(false);
   });
 
   test('per-call frenzy bounds (min 36, max 48) raise the crew above the instance maximum of 30', async ({ page }) => {
@@ -260,6 +273,24 @@ test.describe('script tag', () => {
       null,
       { timeout: 10_000 },
     );
+  });
+
+  test('with preload.css the intro hides and builds the pieces inside the sections, not just the roots (R30)', async ({ page }) => {
+    await page.addInitScript(() => {
+      const w = window as any;
+      w.hiddenPieces = new Set<Element>();
+      new MutationObserver((recs) => {
+        for (const r of recs) {
+          const t = r.target as Element;
+          if (t.getAttribute('data-cu') === 'h' && !t.hasAttribute('data-cu-section')) w.hiddenPieces.add(t);
+        }
+      }).observe(document, { subtree: true, attributes: true, attributeFilter: ['data-cu'] });
+    });
+    await page.goto('/fixtures/script-tag.html');
+    await page.waitForFunction(() => document.documentElement.classList.contains('cu-ready'));
+    await page.waitForFunction(() => document.querySelectorAll('[data-cu="h"]').length === 0, null, { timeout: 10_000 });
+    // h1, p and .box are pieces: each was hidden and then built.
+    expect(await page.evaluate(() => (window as any).hiddenPieces.size)).toBeGreaterThanOrEqual(3);
   });
 
   test('preload.css reveals the content after the failsafe when the script never loads', async ({ page }) => {

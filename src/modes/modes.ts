@@ -171,25 +171,27 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
     };
     groups.add(run);
 
-    // Areas the observer would fire for at once start now, so cu-ready never precedes their hiding.
+    // Areas the observer would fire for at once start now, in this task. Every position is read
+    // before the first scan and hide, so no read follows a write.
     const vh = host!.viewport().h;
     const nearNow = (el: Element) => {
       const r = el.getBoundingClientRect();
       return r.bottom >= -vh && r.top <= 2 * vh;
     };
+    const now: Slot[] = [];
     const lazy: Slot[] = [];
-    let started = false;
     for (const s of slots) {
-      if (s.cfg.trigger === 'load' || (s.cfg.trigger === 'in-view' && nearNow(s.root))) {
-        startSlot(s, mode);
-        started = true;
-      } else if (s.cfg.trigger === 'in-view') lazy.push(s);
+      if (s.cfg.trigger === 'load' || (s.cfg.trigger === 'in-view' && nearNow(s.root))) now.push(s);
+      else if (s.cfg.trigger === 'in-view') lazy.push(s);
     }
+    const started = now.length > 0;
+    // R30: cu-ready first, so preload.css is not hiding what the scanner measures (same task, no paint).
     if (started) markReady();
+    for (const s of now) startSlot(s, mode);
     if (lazy.length) {
       if (typeof g.IntersectionObserver === 'undefined') {
-        for (const s of lazy) startSlot(s, mode);
         markReady();
+        for (const s of lazy) startSlot(s, mode);
       } else {
         observer = new g.IntersectionObserver(
           (entries) => {
@@ -198,8 +200,8 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
               if (!en.isIntersecting || !s) continue;
               observer?.unobserve(en.target);
               bySlot.delete(en.target);
-              startSlot(s, mode);
               markReady();
+              startSlot(s, mode);
             }
           },
           { rootMargin: '100% 0px' },
@@ -274,8 +276,8 @@ export function curchestra(config?: DeepPartial<Config>): Curchestra {
       };
       let run: Run | null = null;
       const add = () => {
-        run = eng.addArea(current(), cfg, 'transition');
         markReady();
+        run = eng.addArea(current(), cfg, 'transition');
       };
 
       if (typeof doc.startViewTransition === 'function') {
