@@ -74,9 +74,13 @@ export function applyOps(ops: RevealOp[]): void {
         break;
       case 'clip': {
         el.setAttribute('data-cu', 'v');
-        const r = el.getBoundingClientRect();
+        let er = o.elRect;
+        if (!er) {
+          const r = el.getBoundingClientRect();
+          er = { x: r.left, y: r.top, w: r.width, h: r.height };
+        }
         (el as HTMLElement).style.clipPath = clipPolygon(
-          { x: r.left, y: r.top, w: r.width, h: r.height },
+          er,
           o.lines,
           o.progress,
           o.rtl,

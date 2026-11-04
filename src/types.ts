@@ -123,7 +123,7 @@ export type RevealOp =
   | { op: 'hide'; el: Element }
   | { op: 'show'; el: Element }
   | { op: 'fade'; el: Element; ms: number }
-  | { op: 'clip'; el: Element; lines: Rect[]; progress: number; rtl: boolean }
+  | { op: 'clip'; el: Element; lines: Rect[]; progress: number; rtl: boolean; elRect?: Rect }
   | { op: 'unclip'; el: Element };
 
 export type CursorShape = 'arrow' | 'cross' | 'ibeam' | 'pen' | 'dup';
