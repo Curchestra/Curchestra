@@ -189,6 +189,10 @@ export interface Engine {
   destroy(): void;
   on(e: EngineEvent, fn: (payload?: unknown) => void): () => void;
   use(plugin: EnginePlugin): void;
+  /** @internal testing hook: the next frame throws, exercising error recovery */
+  __failNextFrame(): void;
+  /** @internal mark waiting tasks whose elements left the DOM as done, silently (R21) */
+  __prune(root: Element): void;
   stats(): {
     /** last 120 frame script times, ms */
     frameMs: number[];

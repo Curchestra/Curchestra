@@ -8,6 +8,7 @@ import { createStage } from '../stage/stage';
 import type {
   Config, Cursor, Deco, Engine, EngineEvent, EnginePlugin, Host, IdleCtx, Mode, Pt, RevealOp, Run,
 } from '../types';
+import { reportError, attachSafety } from './safety';
 import { type Area, buildArea, finishTask, readLines, readRect } from './area';
 import {
   type Crew, distToRect, edgePoint, exitPoint, inside, makeCrew, moving, offscreen, springTo, syncSprings,
@@ -68,6 +69,7 @@ export function createEngine(host: Host, config: Config): Engine {
   let working = false;
   let firstMove = false;
   let crewChanged = false;
+  let failNext = false;
 
   // ---- events -------------------------------------------------------------
 
@@ -156,7 +158,17 @@ export function createEngine(host: Host, config: Config): Engine {
   function assign(k: Crew, at: Pt, sc: Pt, vp: { w: number; h: number }): boolean {
     const order = areas.length === 1 ? areas : [...areas].sort((p, q) => distToRect(at, p.rect) - distToRect(at, q.rect));
     for (const a of order) {
-      const id = a.sched.pick(at.y + sc.y, sc.y, sc.y + vp.h);
+      let id: number | null;
+      for (;;) {
+        id = a.sched.pick(at.y + sc.y, sc.y, sc.y + vp.h);
+        if (id === null) break;
+        if (a.pruned.has(id)) continue;
+        const pi = a.graph.tasks[id].piece;
+        if (pi === null || a.pieces[pi].el.isConnected) break;
+        // Its element left the DOM since the last prune: finish it silently.
+        a.pruned.add(id);
+        a.sched.add(finishTask(a, id));
+      }
       if (id === null) continue;
       const task = a.graph.tasks[id];
       k.area = a;
@@ -189,6 +201,11 @@ export function createEngine(host: Host, config: Config): Engine {
       inFrame = true;
       more = step();
       ok = true;
+    } catch (err) {
+      // Never leave the page hidden: log, then reveal everything (events still fire below).
+      reportError(host, err);
+      engine.finishAll();
+      ok = true;
     } finally {
       // Reset even if the body threw, so a later wake() can still schedule.
       inFrame = false;
@@ -204,6 +221,10 @@ export function createEngine(host: Host, config: Config): Engine {
 
   /** One frame body; returns whether the loop should continue. */
   function step(): boolean {
+    if (failNext) {
+      failNext = false;
+      throw new Error('injected frame failure');
+    }
     const t0 = host.now();
     const dt = last < 0 ? 1 / 60 : clamp((t0 - last) / 1000, 0, MAX_DT);
     last = t0;
@@ -280,6 +301,14 @@ export function createEngine(host: Host, config: Config): Engine {
         allIdle = false;
         const a = k.area;
         const task = a.graph.tasks[c.task];
+        const pi = task.piece;
+        if (pi !== null && !a.pieces[pi].el.isConnected) {
+          // Element removed while being worked on: end silently, no ops (R21).
+          a.sched.add(finishTask(a, c.task));
+          freeCrew(k);
+          busy = true;
+          continue;
+        }
         let arrived = false;
         if (c.phase === 'enter' || c.phase === 'travel') {
           const tx = k.ctx.rect.x + k.off.x;
@@ -454,6 +483,7 @@ export function createEngine(host: Host, config: Config): Engine {
       if (destroyed) return;
       engine.finishAll();
       destroyed = true;
+      disposeSafety();
       halt();
       revealAll(doc);
       stage.destroy();
@@ -481,11 +511,27 @@ export function createEngine(host: Host, config: Config): Engine {
     use(plugin) {
       plugins.push(plugin);
     },
+    __failNextFrame() {
+      failNext = true;
+    },
+    __prune(root) {
+      for (const a of areas) {
+        if (a.root !== root) continue;
+        for (const t of a.graph.tasks) {
+          if ((t.state !== 'wait' && t.state !== 'ready') || t.piece === null || a.pruned.has(t.id)) continue;
+          if (a.pieces[t.piece].el.isConnected) continue;
+          a.pruned.add(t.id);
+          a.sched.add(finishTask(a, t.id));
+        }
+      }
+      wake();
+    },
     stats: () => ({
       frameMs: [...frameMs],
       decos: [...decos],
       cursors: crew.map(({ c }) => ({ id: c.id, name: c.name, x: c.x, y: c.y, phase: c.phase, alpha: c.alpha })),
     }),
   };
+  const disposeSafety = attachSafety(engine, host, config);
   return engine;
 }

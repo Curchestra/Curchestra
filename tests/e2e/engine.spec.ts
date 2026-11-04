@@ -224,7 +224,7 @@ test('pause and resume inside a listener leave exactly one rAF pending', async (
   expect(r).toEqual({ toggled: true, maxPending: 1 });
 });
 
-test('the loop recovers after a frame throws', async ({ page }) => {
+test('a frame that throws is recovered: area revealed, loop usable again (T11)', async ({ page }) => {
   const r = await page.evaluate(() => {
     const w = window as any;
     const cu = w.cu;
@@ -235,18 +235,18 @@ test('the loop recovers after a frame throws', async ({ page }) => {
     eng.use({ onTask: () => { if (threw++ === 0) throw new Error('boom'); } });
     eng.addArea(document.querySelector('#hero'), cfg, 'section');
     let caught = false;
-    for (let i = 0; i < 300 && !caught; i++) {
-      try { m.step(1); } catch { caught = true; }
-    }
+    try { m.step(300); } catch { caught = true; }
+    const heroHidden = document.querySelectorAll('#hero [data-cu="h"]').length;
     const pendingAfterThrow = m.pending();
-    window.dispatchEvent(new Event('scroll'));
-    const pendingAfterWake = m.pending();
+    eng.addArea(document.querySelector('#cards'), cfg, 'section');
+    const pendingAfterAdd = m.pending();
     m.step(600);
-    return { caught, pendingAfterThrow, pendingAfterWake, hidden: document.querySelectorAll('[data-cu="h"]').length };
+    return { caught, heroHidden, pendingAfterThrow, pendingAfterAdd, hidden: document.querySelectorAll('[data-cu="h"]').length };
   });
-  expect(r.caught).toBe(true);
+  expect(r.caught).toBe(false);
+  expect(r.heroHidden).toBe(0);
   expect(r.pendingAfterThrow).toBe(0);
-  expect(r.pendingAfterWake).toBe(1);
+  expect(r.pendingAfterAdd).toBe(1);
   expect(r.hidden).toBe(0);
 });
 

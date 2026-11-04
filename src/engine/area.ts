@@ -19,6 +19,8 @@ export interface Area {
   resolve: () => void;
   /** live viewport rect of the root, refreshed in the read phase */
   rect: Rect;
+  /** tasks completed silently by pruning; they may still sit in the scheduler queue */
+  pruned: Set<number>;
 }
 
 export function readRect(el: Element): Rect {
@@ -83,7 +85,7 @@ export function buildArea(
   markArea(root, pieces.map((p) => p.el));
   const sched = createScheduler(graph, host.viewport().h);
   sched.add(ready);
-  return { root, cfg, mode, pieces, graph, sched, left: graph.tasks.length, done: false, rect };
+  return { root, cfg, mode, pieces, graph, sched, left: graph.tasks.length, done: false, rect, pruned: new Set() };
 }
 
 /** Marks a task done once; returns newly ready ids (empty when it was already done). */
