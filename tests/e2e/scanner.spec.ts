@@ -114,7 +114,7 @@ test.describe('big', () => {
     expect(await page.evaluate(() => document.body.innerHTML)).toBe(before);
   });
 
-  test('scan takes under 40 ms', async ({ page, browserName }) => {
+  test('scan takes under 40 ms @perf', async ({ page, browserName }) => {
     test.skip(browserName !== 'chromium', 'timing budget is asserted in chromium only');
     const ms = await page.evaluate(() => {
       const cu = (window as any).cu;

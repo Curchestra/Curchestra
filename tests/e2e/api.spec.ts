@@ -110,7 +110,7 @@ test.describe('api', () => {
     expect(r).toEqual({ msg: 'nope', left: 0 });
   });
 
-  test('data-cu-speed makes that section build faster', async ({ page }) => {
+  test('data-cu-speed makes that section build faster @perf', async ({ page }) => {
     const time = async (speedAttr: string | null) => {
       await open(page, 'spa.html');
       return page.evaluate(async (attr) => {

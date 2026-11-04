@@ -32,7 +32,12 @@
     "postbuild": "node scripts/dist.mjs css",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:perf": "vitest run --config vitest.perf.config.ts && playwright test -c playwright.perf.config.ts --grep @perf --workers=1 --project=chromium",
+    "bench": "node --experimental-strip-types bench/run.ts",
+    "size": "size-limit",
+    "dev": "vite --config examples/vite.config.ts",
+    "sri": "node scripts/sri.mjs"
   },
   "license": "MIT",
   "devDependencies": {

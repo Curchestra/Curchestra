@@ -116,15 +116,4 @@ describe('plan', () => {
     expect(completeTask(graph, g).sort()).toEqual(texts.sort());
     expect(graph.tasks[texts[0]].state).toBe('ready');
   });
-
-  it('plans a 2000-piece chain in < 20ms', () => {
-    reset();
-    const ps: Piece[] = [];
-    for (let i = 0; i < 2000; i++) ps.push(mk({ parent: i ? i - 1 : null, sig: 's' + i }));
-    plan(ps, fx());
-    const t0 = performance.now();
-    const { graph } = plan(ps, fx());
-    expect(performance.now() - t0).toBeLessThan(20);
-    expect(graph.tasks).toHaveLength(2000);
-  });
 });

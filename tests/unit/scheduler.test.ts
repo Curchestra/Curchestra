@@ -79,18 +79,6 @@ describe('scheduler', () => {
     expect(s.pick(4000, 0, 100)).toBe(1);
     expect(s.pick(4000, 0, 100)).toBe(0);
   });
-
-  it('1,000 picks over 5,000 tasks take < 5 ms', () => {
-    const specs: Array<[number]> = [];
-    for (let i = 0; i < 5000; i++) specs.push([(i % 100) * 100 + ((i * 37) % 100)]);
-    const g = graphOf(specs);
-    const s = createScheduler(g, 100);
-    s.add(ids(g));
-    const t0 = performance.now();
-    for (let i = 0; i < 1000; i++) s.pick((i * 97) % 10000, 0, 800);
-    expect(performance.now() - t0).toBeLessThan(5);
-    expect(s.size()).toBe(4000);
-  });
 });
 
 describe('crewTarget', () => {

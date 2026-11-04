@@ -138,7 +138,7 @@ test('same seed gives the same task sequence', async ({ page }) => {
   expect(b).toEqual(a);
 });
 
-test('median frame time stays within 2 ms at 30 cursors', async ({ page, browserName }) => {
+test('median frame time stays within 2 ms at 30 cursors @perf', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'perf budget is measured in chromium');
   test.setTimeout(60_000);
   await page.goto('/fixtures/big.html');

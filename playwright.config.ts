@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: 'tests/e2e',
+  // Wall-clock budgets run serially via `npm run test:perf` (R24).
+  grepInvert: /@perf/,
   globalSetup: './tests/e2e/global-setup.ts',
   use: { baseURL: 'http://localhost:5179' },
   webServer: {

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Curchestra demo</title>
+<style>
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: #1c1c28; background: #fafafa; }
+  header, main, footer { max-width: 920px; margin: 0 auto; padding: 24px; }
+  header h1 { margin: 0 0 8px; font-size: 40px; }
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .card { background: #fff; border: 1px solid #d8d8e4; border-radius: 8px; padding: 16px; }
+  .card img { display: block; width: 100%; height: 120px; background: #c5cae9; border-radius: 4px; margin-bottom: 8px; }
+  #features { background: #e8eaf6; border-radius: 8px; padding: 24px; margin: 24px 0; }
+  #stage { border: 2px solid #3949ab; border-radius: 8px; padding: 24px; margin: 24px 0; min-height: 160px; }
+  .spacer { height: 320px; }
+  button, select { font: inherit; }
+  #panel {
+    position: fixed; right: 16px; bottom: 16px; width: 260px; padding: 12px 16px; z-index: 2147483600;
+    background: #1a1a2e; color: #fff; border-radius: 8px; box-shadow: 0 4px 24px rgb(0 0 0 / 0.3); font-size: 14px;
+  }
+  #panel label { display: flex; justify-content: space-between; align-items: center; margin: 6px 0; gap: 8px; }
+  #panel .buttons { display: flex; gap: 6px; margin-top: 10px; }
+  #panel button { flex: 1; padding: 6px 4px; cursor: pointer; }
+  #panel h2 { margin: 0 0 4px; font-size: 15px; }
+  @media (max-width: 700px) { .cards { grid-template-columns: 1fr; } #panel { position: static; width: auto; margin: 16px; } }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Curchestra</h1>
+    <p>A swarm of cursors builds this page's real DOM, piece by piece. Everything you see is live HTML: select text, click links.</p>
+  </header>
+  <main>
+    <div class="cards">
+      <div class="card"><img alt="placeholder"><h3>Measure</h3><p>Only what is near the screen is scanned, as it is reached.</p></div>
+      <div class="card"><img alt="placeholder"><h3>Plan</h3><p>Parents are built before children; text is typed line by line.</p></div>
+      <div class="card"><img alt="placeholder"><h3>Reveal</h3><p>Clip-paths and fades uncover the page itself, never a copy.</p></div>
+    </div>
+    <section id="features">
+      <h2>Features</h2>
+      <p>Presets, typed options, HTML attributes, idle behaviors, reduced motion support and a failsafe that always reveals everything.</p>
+      <button type="button">A real, clickable button</button>
+    </section>
+    <div class="spacer"></div>
+    <section id="stage">
+      <h2 id="stage-title">View A</h2>
+      <p id="stage-body">This block is swapped by the transition button, with a cross-fade into a fresh build.</p>
+    </section>
+  </main>
+  <footer><p>Scroll down while it builds: the crew follows you.</p></footer>
+
+  <aside id="panel" data-cu-skip aria-label="Demo controls">
+    <h2>Curchestra demo</h2>
+    <label>Preset
+      <select id="preset"><option>default</option><option>calm</option><option>frenzy</option></select>
+    </label>
+    <label>idle.behavior
+      <select id="behavior"><option>orbit</option><option>flock</option><option>wander</option><option>leave</option><option>hide</option></select>
+    </label>
+    <label>idle.noPointer
+      <select id="nopointer"><option>last-touch</option><option>wander</option><option>stay</option></select>
+    </label>
+    <label>Sound <input id="sound" type="checkbox"></label>
+    <div class="buttons">
+      <button type="button" id="b-page">Page</button>
+      <button type="button" id="b-section">Section</button>
+      <button type="button" id="b-transition">Transition</button>
+    </div>
+  </aside>
+
+  <script type="module">
+    import { curchestra } from '/src/index.ts';
+
+    const $ = (id) => document.getElementById(id);
+    let swarm = null;
+
+    function fresh() {
+      swarm?.destroy();
+      swarm = curchestra({
+        preset: $('preset').value,
+        idle: { behavior: $('behavior').value, noPointer: $('nopointer').value },
+        sound: $('sound').checked ? { volume: 0.4 } : false,
+      });
+      return swarm;
+    }
+
+    $('b-page').onclick = () => fresh().page();
+    $('b-section').onclick = () => fresh().section('#features', { trigger: 'load' });
+
+    let b = false;
+    $('b-transition').onclick = () => {
+      b = !b;
+      return fresh().transition(
+        () => {
+          $('stage-title').textContent = b ? 'View B' : 'View A';
+          $('stage-body').textContent = b
+            ? 'A different view, built by the swarm after the old one faded out.'
+            : 'This block is swapped by the transition button, with a cross-fade into a fresh build.';
+        },
+        { root: '#stage' },
+      );
+    };
+
+    window.swarm = () => swarm;
+  </script>
+</body>
+</html>
