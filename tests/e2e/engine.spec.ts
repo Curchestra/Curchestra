@@ -399,6 +399,38 @@ test('a throwing event listener is logged and finishAll() still reveals every ar
   expect(r).toEqual({ threw: false, completes: 1, hidden: 0, tag: '[curchestra]' });
 });
 
+test('section mode: cursors spawn at the section edge, not the viewport edge (R33)', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const w = window as any;
+    const cu = w.cu;
+    const m = w.manualHost();
+    const cards = document.querySelector('#cards') as HTMLElement;
+    // Away from every viewport edge, so the two kinds of edge cannot coincide.
+    cards.style.margin = '0 200px';
+    // Slow motion: a cursor is still at its spawn point on the frame it first appears.
+    const cfg = cu.resolveConfig({ seed: 1, speed: 0.01, failsafe: 60_000 });
+    const eng = cu.createEngine(m.host, cfg);
+    eng.addArea(cards, cfg, 'section');
+    const spawns = new Map<number, { x: number; y: number }>();
+    for (let i = 0; i < 120; i++) {
+      m.step(1);
+      for (const c of eng.stats().cursors) if (!spawns.has(c.id)) spawns.set(c.id, { x: c.x, y: c.y });
+    }
+    const b = cards.getBoundingClientRect();
+    const fromEdge = [...spawns.values()].map((p) => {
+      const dx = Math.max(b.left - p.x, 0, p.x - b.right);
+      const dy = Math.max(b.top - p.y, 0, p.y - b.bottom);
+      const outside = Math.hypot(dx, dy);
+      const inside = Math.min(p.x - b.left, b.right - p.x, p.y - b.top, b.bottom - p.y);
+      return outside > 0 ? outside : inside;
+    });
+    eng.destroy();
+    return { n: spawns.size, worst: Math.max(...fromEdge) };
+  });
+  expect(r.n).toBeGreaterThan(1);
+  expect(r.worst).toBeLessThanOrEqual(40);
+});
+
 test('cancel reveals without events; finish emits section:done', async ({ page }) => {
   const r = await page.evaluate(async () => {
     const cu = (window as any).cu;

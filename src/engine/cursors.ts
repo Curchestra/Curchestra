@@ -15,6 +15,10 @@ const SPAWN_OUT = 32;
 const EXIT_OUT = 48;
 const GONE = 30;
 const SUBSTEP = 1 / 120;
+/** seconds to fade in at a section edge */
+const FADE_IN_S = 0.3;
+/** px before a section exit point over which a leaving cursor fades out */
+const FADE_OUT_PX = 48;
 
 /** Engine-side state for one cursor. */
 export interface Crew {
@@ -32,6 +36,8 @@ export interface Crew {
   /** where the cursor became free */
   home: Pt;
   exit: Pt | null;
+  /** leaving through a section edge, which may be on screen: fade out on the way (R33) */
+  fadeOut: boolean;
 }
 
 export function makeCrew(
@@ -71,25 +77,59 @@ export function makeCrew(
     effects,
     color,
   };
-  return { c, area: null, action: null, ctx, t: 0, off: { x: 0, y: 0 }, key: 0, home: { ...at }, exit: null };
+  return { c, area: null, action: null, ctx, t: 0, off: { x: 0, y: 0 }, key: 0, home: { ...at }, exit: null, fadeOut: false };
 }
 
-/** A point `out` px beyond the viewport edge nearest to `p`. */
-export function edgePoint(p: Pt, vp: { w: number; h: number }, out = SPAWN_OUT): Pt {
-  const cx = Math.min(Math.max(p.x, 0), vp.w);
-  const cy = Math.min(Math.max(p.y, 0), vp.h);
-  const l = p.x;
-  const r = vp.w - p.x;
-  const t = p.y;
-  const b = vp.h - p.y;
-  const m = Math.min(l, r, t, b);
-  if (m === l) return { x: -out, y: cy };
-  if (m === r) return { x: vp.w + out, y: cy };
-  if (m === t) return { x: cx, y: -out };
-  return { x: cx, y: vp.h + out };
+/** A point `out` px beyond the edge of `r` nearest to `p`. */
+export function edgePoint(p: Pt, r: Rect, out = SPAWN_OUT): Pt {
+  const x1 = r.x + r.w;
+  const y1 = r.y + r.h;
+  const cx = Math.min(Math.max(p.x, r.x), x1);
+  const cy = Math.min(Math.max(p.y, r.y), y1);
+  const l = p.x - r.x;
+  const rt = x1 - p.x;
+  const t = p.y - r.y;
+  const b = y1 - p.y;
+  const m = Math.min(l, rt, t, b);
+  if (m === l) return { x: r.x - out, y: cy };
+  if (m === rt) return { x: x1 + out, y: cy };
+  if (m === t) return { x: cx, y: r.y - out };
+  return { x: cx, y: y1 + out };
 }
 
-export const exitPoint = (p: Pt, vp: { w: number; h: number }): Pt => edgePoint(p, vp, EXIT_OUT);
+/** R33: section areas confine entry and exit to their live rect; page and transition use the viewport. */
+export function confineRect(area: Area | null, vp: { w: number; h: number }): Rect {
+  return area?.mode === 'section' ? area.rect : { x: 0, y: 0, w: vp.w, h: vp.h };
+}
+
+/** Place a new cursor just outside the edge nearest its first task; at a section edge it fades in. */
+export function spawnAt(k: Crew, vp: { w: number; h: number }): void {
+  const at = edgePoint({ x: k.ctx.rect.x + k.off.x, y: k.ctx.rect.y + k.off.y }, confineRect(k.area, vp));
+  k.c.x = k.c.sx.x = at.x;
+  k.c.y = k.c.sy.x = at.y;
+  k.home = at;
+  if (k.area?.mode === 'section') k.c.alpha = 0;
+}
+
+export function fadeIn(c: Cursor, dt: number): void {
+  if (c.alpha < 1) c.alpha = Math.min(1, c.alpha + dt / FADE_IN_S);
+}
+
+/** Start leaving through the nearest edge of the cursor's confinement rect. */
+export function sendOut(k: Crew, vp: { w: number; h: number }): void {
+  k.c.phase = 'leave';
+  k.exit = edgePoint(k.c, confineRect(k.area, vp), EXIT_OUT);
+  k.fadeOut = k.area?.mode === 'section';
+}
+
+/** Move a leaving cursor toward its exit; returns true once it is gone. */
+export function leaveStep(k: Crew, dt: number, vp: { w: number; h: number }): boolean {
+  const c = k.c;
+  const e = k.exit!;
+  springTo(c, e.x, e.y, dt);
+  if (k.fadeOut) c.alpha = Math.min(c.alpha, Math.hypot(e.x - c.x, e.y - c.y) / FADE_OUT_PX);
+  return offscreen(c, vp) || (k.fadeOut && c.alpha < 0.02);
+}
 
 export function offscreen(c: Cursor, vp: { w: number; h: number }): boolean {
   return c.x < -GONE || c.y < -GONE || c.x > vp.w + GONE || c.y > vp.h + GONE;

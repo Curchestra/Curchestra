@@ -11,7 +11,7 @@ import type {
 import { reportError, attachSafety } from './safety';
 import { type Area, buildArea, finishTask, readLines, readRect } from './area';
 import {
-  type Crew, distToRect, edgePoint, exitPoint, inside, makeCrew, moving, offscreen, springTo, syncSprings,
+  type Crew, distToRect, fadeIn, inside, leaveStep, makeCrew, moving, sendOut, spawnAt, springTo, syncSprings,
 } from './cursors';
 
 const SPAWN_EVERY = 0.12;
@@ -286,8 +286,7 @@ export function createEngine(host: Host, config: Config): Engine {
         crewChanged = true;
         live--;
       } else if (k.c.phase === 'idle') {
-        k.c.phase = 'leave';
-        k.exit = exitPoint(k.c, vp);
+        sendOut(k, vp);
         live--;
       }
     }
@@ -296,10 +295,7 @@ export function createEngine(host: Host, config: Config): Engine {
       if (assign(k, { x: vp.w / 2, y: vp.h / 2 }, sc, vp)) {
         spawned++;
         lastSpawn = time;
-        const at = edgePoint({ x: k.ctx.rect.x + k.off.x, y: k.ctx.rect.y + k.off.y }, vp);
-        k.c.x = k.c.sx.x = at.x;
-        k.c.y = k.c.sy.x = at.y;
-        k.home = at;
+        spawnAt(k, vp);
         crew.push(k);
         crewChanged = true;
       }
@@ -333,6 +329,7 @@ export function createEngine(host: Host, config: Config): Engine {
           continue;
         }
         let arrived = false;
+        fadeIn(c, dt);
         if (c.phase === 'enter' || c.phase === 'travel') {
           const tx = k.ctx.rect.x + k.off.x;
           const ty = k.ctx.rect.y + k.off.y;
@@ -368,9 +365,8 @@ export function createEngine(host: Host, config: Config): Engine {
         }
         busy = true;
       } else if (c.phase === 'leave') {
-        springTo(c, k.exit!.x, k.exit!.y, dt * cfg.speed);
         busy = true;
-        if (offscreen(c, vp)) {
+        if (leaveStep(k, dt * cfg.speed, vp)) {
           crew.splice(i, 1);
           crewChanged = true;
           continue;
@@ -390,8 +386,7 @@ export function createEngine(host: Host, config: Config): Engine {
           };
           const tgt = idleTarget(behavior, cfg.idle.noPointer, cfg.idle.radius, ictx);
           if (tgt === 'leave') {
-            c.phase = 'leave';
-            k.exit = exitPoint(c, vp);
+            sendOut(k, vp);
           } else if (tgt === 'hide') {
             springTo(c, k.home.x, k.home.y, dt);
             c.alpha = Math.max(0, c.alpha - dt / HIDE_S);
