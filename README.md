@@ -144,6 +144,7 @@ Note: the rule's `animation` shorthand overrides any author `animation` on those
 - Elements added to an area while it is still building are not given their own cursor animation. They appear together with their nearest hidden ancestor (or with the area, at its end).
 - The ESM build expects a bundler. Script-tag users should use the IIFE (`dist/curchestra.js`).
 - `seed`, `theme`, `zIndex` and `agents.showNames` are instance-level: set them in `curchestra(config)`. Per call or per attribute they are ignored (with a development warning).
+- Crew bounds (`agents.min` / `agents.max`) are the maximum across all active areas' resolved configs, since one shared crew serves every area.
 - Server-side rendering is safe (importing has no side effects, every call is a no-op without a DOM), but there is nothing to animate there.
 
 ## Why Curchestra
@@ -154,18 +155,18 @@ Performance rows come from [`bench/results.md`](bench/results.md): one 8 s run p
 |---|---|---|
 | Where it runs | Your own browser (extension) | Any website (npm or script tag) |
 | Scope | Whole page only | Whole page, one section, or a transition |
-| Start-up | Copies the page; scrolls through all of it first. Time to first cursor move: 1,647 ms (landing), 1,809 ms (long), 3,067 ms (big) | Measures only what's near the screen, as it's reached. Time to first move: 19 ms (landing), 13 ms (long), 77 ms (big) |
-| Per frame | Script time per frame: 0.75 ms (landing), 0.50 ms (long), 0.95 ms (big) | 0.46 ms (landing), 0.48 ms (long), 0.54 ms (big) |
-| Memory | Peak heap 6.0 / 5.9 / 28.8 MB | Peak heap 4.7 / 4.5 / 4.9 MB |
-| Long tasks (> 50 ms) | 1 / 1 / 2 (worst 727 ms on big) | 0 / 0 / 0 |
+| Start-up | Copies the page; scrolls through all of it first. Time to first cursor move: 1,661 ms (landing), 1,843 ms (long), 3,180 ms (big) | Measures only what's near the screen, as it's reached. Time to first move: 16 ms (landing), 22 ms (long), 80 ms (big, not gated) |
+| Per frame | Script time per frame: 0.89 ms (landing), 0.61 ms (long), 1.18 ms (big) | 0.55 ms (landing), 0.58 ms (long), 0.76 ms (big) |
+| Memory | Peak heap 6.0 / 5.8 / 29.3 MB | Peak heap 4.6 / 4.6 / 4.9 MB |
+| Long tasks (> 50 ms) | 1 / 1 / 2 (worst 828 ms on big) | 0 / 0 / 0 |
 | Page during animation | Covered by a copy | The real page: clickable and readable by search engines |
 | Configuration | None (hard-coded) | Presets, typed options, HTML attributes |
 | Idle | Flocks to the mouse when finished | orbit / flock / wander / leave / hide, plus 3 no-pointer options |
 | Failure handling | Can leave the page half-built | Failsafe always reveals everything |
 | Accessibility | None | Respects reduced motion; click/focus/Tab skips |
-| Size | ~3,800-line single file | 14.2 KB gzipped core (budget 15 KB); sound only if enabled |
+| Size | Single file of about 3,800 lines (line count of the original `swarm.js`) | 14.2 KB gzipped core as measured by size-limit (budget 15 KB); sound only if enabled |
 
-Numbers vary run to run and with the machine. On the "big" fixture (a 1,500-piece page) Curchestra's first move (77 ms) is over its own 50 ms budget, and an earlier run also showed two long tasks of about 60 ms; see `bench/results.md` and re-run `npm run bench` for current numbers.
+Numbers vary run to run and with the machine (three consecutive runs gave 11-22 ms first move on landing and long, 73-80 ms on big). The "big" fixture is a stress page of 20,000 elements (1,500 is only the default `maxTasks` cap); it is reported but excluded from the 50 ms first-move gate, while the script-time and long-task gates apply to every fixture. In one of three runs Curchestra had a single 52 ms long task on big, just over the 50 ms budget. See `bench/results.md` and re-run `npm run bench`.
 
 ## Development
 

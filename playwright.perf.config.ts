@@ -7,5 +7,6 @@ export default defineConfig({
   grepInvert: undefined,
   grep: /@perf/,
   workers: 1,
+  retries: 0,
   fullyParallel: false,
 });

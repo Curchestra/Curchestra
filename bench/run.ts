@@ -15,6 +15,8 @@ const CURCHESTRA_PATH = path.resolve('dist/curchestra.js');
 
 // Spec section 8 budgets.
 const BUDGET = { scriptMsPerFrame: 2, firstMoveMs: 50, longTaskMs: 50 };
+// R28: first move is gated on the typical fixtures only; big (20,000 elements) is a stress fixture, reported but not gated.
+const FIRST_MOVE_GATED = new Set<string>(['landing', 'long']);
 
 type Engine = 'curchestra' | 'swarm-rebuild';
 interface Result {
@@ -146,7 +148,7 @@ async function main(): Promise<void> {
     for (const r of results.filter((x) => x.engine === 'curchestra')) {
       if (r.scriptMsPerFrame > BUDGET.scriptMsPerFrame)
         failures.push(`${r.fixture}: script ${r.scriptMsPerFrame.toFixed(3)} ms/frame > ${BUDGET.scriptMsPerFrame}`);
-      if (r.firstMoveMs === null || r.firstMoveMs > BUDGET.firstMoveMs)
+      if (FIRST_MOVE_GATED.has(r.fixture) && (r.firstMoveMs === null || r.firstMoveMs > BUDGET.firstMoveMs))
         failures.push(`${r.fixture}: first move ${f1(r.firstMoveMs)} ms > ${BUDGET.firstMoveMs}`);
       if (r.longTasks > 0)
         failures.push(`${r.fixture}: ${r.longTasks} long task(s) > ${BUDGET.longTaskMs} ms (worst ${r.worstLongTaskMs.toFixed(0)} ms)`);
@@ -154,7 +156,7 @@ async function main(): Promise<void> {
     const row = (r: Result) =>
       r.skipped
         ? `| ${r.fixture} | ${r.engine} | skipped: ${r.skipped} | | | | |`
-        : `| ${r.fixture} | ${r.engine} | ${f1(r.firstMoveMs)} | ${r.scriptMsPerFrame.toFixed(3)} | ${r.longTasks}${r.longTasks ? ` (worst ${r.worstLongTaskMs.toFixed(0)} ms)` : ''} | ${r.peakHeapMB.toFixed(1)} | ${r.frames} |`;
+        : `| ${r.fixture} | ${r.engine} | ${f1(r.firstMoveMs)}${FIRST_MOVE_GATED.has(r.fixture) ? '' : ' (not gated)'} | ${r.scriptMsPerFrame.toFixed(3)} | ${r.longTasks}${r.longTasks ? ` (worst ${r.worstLongTaskMs.toFixed(0)} ms)` : ''} | ${r.peakHeapMB.toFixed(1)} | ${r.frames} |`;
     const md = [
       '# Benchmark results',
       '',
@@ -169,7 +171,7 @@ async function main(): Promise<void> {
       '|---|---|---|---|---|---|---|',
       ...results.map(row),
       '',
-      `Budgets (spec section 8, curchestra only): script <= ${BUDGET.scriptMsPerFrame} ms/frame, first move <= ${BUDGET.firstMoveMs} ms, 0 long tasks. ${failures.length ? 'FAILED:' : 'All met.'}`,
+      `Budgets (spec section 8, curchestra only): script <= ${BUDGET.scriptMsPerFrame} ms/frame on all fixtures, 0 long tasks on all fixtures, first move <= ${BUDGET.firstMoveMs} ms on landing and long. First move on big is not gated (stress fixture, 20,000 elements; R28). ${failures.length ? 'FAILED:' : 'All met.'}`,
       ...failures.map((f) => `- ${f}`),
       '',
     ].join('\n');

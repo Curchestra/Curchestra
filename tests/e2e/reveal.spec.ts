@@ -24,8 +24,8 @@ test('show on parent reveals non-piece child, piece child stays hidden', async (
     cu.markArea(document.querySelector('#parent'), [document.querySelector('#piece')]);
     cu.applyOps([{ op: 'show', el: document.querySelector('#parent') }]);
   });
-  expect(await vis(page, '#plain')).toBe('visible');
-  expect(await vis(page, '#piece')).toBe('hidden');
+  await expect.poll(() => vis(page, '#plain')).toBe('visible');
+  await expect.poll(() => vis(page, '#piece')).toBe('hidden');
 });
 
 test('clip sets a clip-path, revealAll clears it and cleans up', async ({ page }) => {

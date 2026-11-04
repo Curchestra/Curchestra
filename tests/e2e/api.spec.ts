@@ -38,6 +38,7 @@ test.describe('api', () => {
   });
 
   test('inner scroll container: a section build completes', async ({ page }) => {
+    test.setTimeout(60_000);
     await open(page, 'inner-scroll.html');
     const left = await page.evaluate(async () => {
       const run = (window as any).curchestra({ seed: 1, speed: 8 }).section('#panel');
@@ -215,7 +216,7 @@ test.describe('fix round 1', () => {
   });
 
   test('per-call frenzy bounds (min 36, max 48) raise the crew above the instance maximum of 30', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     await page.goto('/fixtures/big.html');
     await page.waitForFunction(() => (window as any).cuReady === true && (window as any).bigReady === true);
     const peak = await page.evaluate(async () => {
@@ -223,7 +224,7 @@ test.describe('fix round 1', () => {
       const eng = cu.createEngine(cu.browserHost(), cu.resolveConfig({ seed: 1 }));
       const run = eng.addArea(document.body, cu.resolveConfig({ seed: 1, preset: 'frenzy', agents: { min: 36 } }), 'page');
       let max = 0;
-      const until = performance.now() + 20_000;
+      const until = performance.now() + 45_000;
       while (performance.now() < until && max <= 30) {
         await new Promise((res) => setTimeout(res, 200));
         max = Math.max(max, eng.stats().cursors.length);

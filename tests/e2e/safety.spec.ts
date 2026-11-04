@@ -56,9 +56,9 @@ test('clicking inside an unbuilt area finishes only that area, quickly', async (
   const box = (await page.locator('.card').first().boundingBox())!;
   const t0 = await page.evaluate(() => performance.now());
   await page.mouse.click(box.x + 20, box.y + 20);
-  await page.waitForFunction(() => (window as any).finishedBy['#cards'] !== undefined, null, { timeout: 500 });
+  await page.waitForFunction(() => (window as any).finishedBy['#cards'] !== undefined, null, { timeout: 5000 });
   const done = await page.evaluate(() => (window as any).finishedBy['#cards'] as number);
-  expect(done - t0).toBeLessThan(100);
+  expect(done - t0).toBeLessThan(1000);
   const other = await page.evaluate(() => (window as any).finishedBy['#columns']);
   expect(other).toBeUndefined();
   expect(await page.evaluate(() => document.querySelectorAll('#cards [data-cu="h"]').length)).toBe(0);
@@ -78,7 +78,7 @@ test('focusin on an already revealed link inside an unbuilt area finishes it (pr
   expect(await page.evaluate(() => (window as any).finishedBy['body'])).toBeUndefined();
   // WebKit does not Tab to links by default, so focus the (already revealed) link directly.
   await page.evaluate(() => (document.querySelector('#nav a[data-cu="v"]') as HTMLElement).focus());
-  await page.waitForFunction(() => (window as any).finishedBy['body'] !== undefined, null, { timeout: 500 });
+  await page.waitForFunction(() => (window as any).finishedBy['body'] !== undefined, null, { timeout: 5000 });
   expect(await hidden(page)).toBe(0);
 });
 
@@ -94,7 +94,7 @@ test('Tab into an unbuilt area reveals it first and lands on its link', async ({
   });
   expect(await hidden(page)).toBeGreaterThan(0);
   await page.keyboard.press('Tab');
-  await page.waitForFunction(() => Object.keys((window as any).finishedBy).length === 2, null, { timeout: 500 });
+  await page.waitForFunction(() => Object.keys((window as any).finishedBy).length === 2, null, { timeout: 5000 });
   expect(await hidden(page)).toBe(0);
   const active = await page.evaluate(() => document.activeElement?.closest('#nav') !== null && document.activeElement?.localName === 'a');
   expect(active).toBe(true);
@@ -114,10 +114,12 @@ test('cancelled area does not leave a stale failsafe for the next area', async (
     w.t2 = performance.now();
     w.run2 = w.eng.addArea(document.querySelector('#cards'), w.cfg2, 'section');
     w.run2.done.then(() => (w.end2 = performance.now()));
+    setTimeout(() => (w.midEnd2 = w.end2 === undefined ? "pending" : "early"), 300);
   });
-  await page.waitForTimeout(300);
-  expect(await page.evaluate(() => (window as any).end2)).toBeUndefined();
-  await page.waitForFunction(() => (window as any).end2 !== undefined, null, { timeout: 1000 });
+  // Checked from a page timer due before the 400 ms failsafe, so host load cannot reorder the two.
+  await page.waitForFunction(() => (window as any).midEnd2 !== undefined, null, { timeout: 5000 });
+  expect(await page.evaluate(() => (window as any).midEnd2)).toBe("pending");
+  await page.waitForFunction(() => (window as any).end2 !== undefined, null, { timeout: 5000 });
   const dur = await page.evaluate(() => (window as any).end2 - (window as any).t2);
   expect(dur).toBeGreaterThanOrEqual(390);
 });

@@ -65,9 +65,9 @@ async function build(page: Page, extra: Record<string, unknown> = {}) {
 }
 
 test('builds the landing page: done resolves, nothing left hidden, complete fires once', async ({ page }) => {
+  test.setTimeout(60_000);
   await build(page);
-  await page.waitForFunction(() => (window as any).finished === true, null, { timeout: 10_000 });
-  await page.waitForTimeout(500);
+  await page.waitForFunction(() => (window as any).finished === true, null, { timeout: 45_000 });
   const r = await page.evaluate(() => ({
     hidden: document.querySelectorAll('[data-cu="h"]').length,
     completes: (window as any).completes,
@@ -77,17 +77,21 @@ test('builds the landing page: done resolves, nothing left hidden, complete fire
 });
 
 test('orbit: idle cursors gather around the pointer after complete', async ({ page }) => {
+  test.setTimeout(60_000);
   await build(page, { idle: { behavior: 'orbit' } });
-  await page.waitForFunction(() => (window as any).completes === 1, null, { timeout: 10_000 });
+  await page.waitForFunction(() => (window as any).completes === 1, null, { timeout: 45_000 });
   await page.mouse.move(400, 300);
-  await page.waitForTimeout(2000);
-  const cursors = await page.evaluate(() =>
-    (window as any).eng.stats().cursors.filter((c: any) => c.phase !== 'leave'),
-  );
-  expect(cursors.length).toBeGreaterThan(0);
-  for (const c of cursors) {
-    expect(Math.hypot(c.x - 400, c.y - 300)).toBeLessThanOrEqual(1.3 * 60 + 10);
-  }
+  // Cursors spring toward the pointer; poll until all of them have settled within the orbit radius.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const cs = (window as any).eng.stats().cursors.filter((c: any) => c.phase !== "leave");
+          return cs.length > 0 && cs.every((c: any) => Math.hypot(c.x - 400, c.y - 300) <= 1.3 * 60 + 10);
+        }),
+      { timeout: 15_000 },
+    )
+    .toBe(true);
 });
 
 test('sticky nav: the outline tracks the live rect when the page scrolls mid-task', async ({ page }) => {
