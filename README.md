@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-color-light.svg">
-    <img src="assets/logo-color.svg" alt="Curchestra" width="420">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Curchestra/Curchestra/HEAD/assets/logo-color-light.svg">
+    <img src="https://raw.githubusercontent.com/Curchestra/Curchestra/HEAD/assets/logo-color.svg" alt="Curchestra" width="420">
   </picture>
 </p>
 
