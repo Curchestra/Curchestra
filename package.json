@@ -2,6 +2,17 @@
   "name": "curchestra",
   "version": "0.1.0",
   "description": "A cursor orchestra that builds a website's real DOM.",
+  "keywords": [
+    "cursor",
+    "animation",
+    "cursors",
+    "page-transition",
+    "scroll-animation",
+    "build-animation",
+    "canvas",
+    "swarm",
+    "typescript"
+  ],
   "type": "module",
   "sideEffects": [
     "*.css"
@@ -37,7 +48,8 @@
     "bench": "node --experimental-strip-types bench/run.ts",
     "size": "size-limit",
     "dev": "vite --config examples/vite.config.ts",
-    "sri": "node scripts/sri.mjs"
+    "sri": "node scripts/sri.mjs",
+    "prepublishOnly": "npm run build"
   },
   "license": "MIT",
   "author": "JoshLei",
@@ -50,5 +62,17 @@
     "typescript": "^6.0.3",
     "vite": "^8.3.5",
     "vitest": "^5.1.0"
+  },
+  "homepage": "https://github.com/Curchestra/Curchestra#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Curchestra/Curchestra.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Curchestra/Curchestra/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }
