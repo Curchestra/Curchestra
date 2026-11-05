@@ -1,4 +1,9 @@
-# Curchestra
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-color-light.svg">
+    <img src="assets/logo-color.svg" alt="Curchestra" width="420">
+  </picture>
+</p>
 
 An orchestra of animated cursors that builds a website's real DOM, piece by piece. Zero dependencies, one small TypeScript library, and the page underneath stays real: clickable, selectable and readable by search engines.
 
