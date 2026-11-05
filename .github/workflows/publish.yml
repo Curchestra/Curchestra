@@ -1,4 +1,4 @@
-name: Publish
+name: Publish Curchestra to npm
 
 on:
   release:
@@ -6,21 +6,98 @@ on:
 
 permissions:
   contents: read
-  id-token: write
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
 
 jobs:
   publish:
+    name: Build, test, and publish
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout release
+        uses: actions/checkout@v6
         with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
-      - run: npm ci
-      - run: npm test
-      - run: npm run build
-      - run: npm run size
-      - run: npm publish --provenance --access public
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      - name: Update npm
+        run: npm install -g npm@^11.5.1
+
+      - name: Show Node.js and npm versions
+        run: |
+          node --version
+          npm --version
+
+      - name: Verify package and release version
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const releaseVersion = process.env.RELEASE_TAG.replace(/^v/, '');
+
+          if (pkg.name !== 'curchestra') {
+            throw new Error(`Expected package "curchestra", found "${pkg.name}".`);
+          }
+
+          if (pkg.private) {
+            throw new Error('package.json marks this package as private.');
+          }
+
+          if (pkg.version !== releaseVersion) {
+            throw new Error(
+              `Release tag ${process.env.RELEASE_TAG} does not match package version ${pkg.version}.`
+            );
+          }
+
+          console.log(`Publishing ${pkg.name}@${pkg.version}`);
+          NODE
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Check bundle size
+        run: npm run size
+
+      - name: Smoke test the build
+        run: |
+          node --input-type=module -e "
+            const m = await import('./dist/index.js');
+            if (typeof m.curchestra !== 'function') throw new Error('curchestra export missing');
+            const app = m.curchestra();
+            for (const k of ['page', 'section', 'transition', 'finish', 'destroy']) {
+              if (typeof app[k] !== 'function') throw new Error('app.' + k + ' missing');
+            }
+            const audio = await import('./dist/audio/index.js');
+            if (typeof audio.createAudio !== 'function') throw new Error('audio chunk missing');
+            const head = (await import('node:fs')).readFileSync('dist/index.js', 'utf8').slice(0, 40);
+            if (!head.includes('curchestra')) throw new Error('license header missing');
+            console.log('curchestra loads');
+          "
+
+      - name: Preview package contents
+        run: npm pack --dry-run
+
+      - name: Publish with provenance
+        run: npm publish --provenance --access public --tag latest
