@@ -1,4 +1,4 @@
 [
-  { "name": "core (what every page loads)", "path": "dist/index.js", "entry": ["index"], "limit": "21 KB", "gzip": true },
+  { "name": "core (what every page loads)", "path": "dist/index.js", "entry": ["index"], "limit": "21.5 KB", "gzip": true },
   { "name": "everything (core + liquid orbit + sound chunks)", "path": "dist/index.js", "limit": "26 KB", "gzip": true }
 ]

@@ -4,7 +4,7 @@ Use Curchestra on any site without a bundler.
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/curchestra@0.1.0/dist/curchestra.js"
+  src="https://cdn.jsdelivr.net/npm/curchestra@0.1.1/dist/curchestra.js"
   integrity="sha384-REPLACE_WITH_OUTPUT_OF_npm_run_sri"
   crossorigin="anonymous"
   data-curchestra="page"
@@ -48,7 +48,7 @@ Attributes win over everything else. See [merge order](CONFIGURATION.md#merge-or
 Add the stylesheet in `<head>` to avoid a flash of the finished page:
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/curchestra@0.1.0/dist/preload.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/curchestra@0.1.1/dist/preload.css">
 ```
 
 It hides `[data-cu-section]` (and, with `class="cu-intro"` on `<body>`, all of the body's children) until Curchestra adds `cu-ready` to `<html>`. If the script never loads, a CSS animation shows the content after `--cu-failsafe` (15 s by default).

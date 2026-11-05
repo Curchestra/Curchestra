@@ -101,6 +101,50 @@ test.describe('landing', () => {
   });
 });
 
+test.describe('flex text', () => {
+  test.beforeEach(async ({ page }) => {
+    await open(page, 'landing');
+    await page.evaluate(() => {
+      const box = document.createElement('section');
+      box.id = 'flex';
+      box.innerHTML = `
+        <ul style="display:flex;gap:16px;list-style:none;padding:0">
+          <li><a id="arrow" href="#" style="display:inline-flex;gap:4px">github <span>↗</span></a></li>
+          <li><a id="icon" href="#" style="display:inline-flex;align-items:center">Open PDF <svg width="14" height="14"><path d="M1 1h10v10"/></svg></a></li>
+        </ul>
+        <p id="pill" style="display:inline-flex;gap:8px"><span style="width:7px;height:7px;background:red;border-radius:50%"></span>Open to roles</p>
+        <div id="layout" style="display:flex;gap:12px">Label<div><p>one</p><p>two</p></div></div>`;
+      document.body.prepend(box);
+    });
+  });
+
+  test('a flex link with an arrow or icon is one text piece', async ({ page }) => {
+    const ps = await scanBody(page);
+    for (const id of ['arrow', 'icon', 'pill']) {
+      const p = ps.find((x) => x.domId === id);
+      expect(p?.kind, id).toBe('text');
+    }
+    // nothing inside them is a piece of its own
+    const inner = await page.evaluate(() => {
+      const cu = (window as any).cu;
+      const els = cu.scan(cu.browserHost(), document.body, { skip: [], maxTasks: 5000 }).map((p: any) => p.el);
+      return els.filter((e: Element) => e.parentElement?.closest('#arrow, #icon, #pill')).length;
+    });
+    expect(inner).toBe(0);
+  });
+
+  test('a flex container holding real blocks is still walked', async ({ page }) => {
+    const ps = await scanBody(page);
+    expect(ps.find((x) => x.domId === 'layout')).toBeUndefined();
+    const inside = await page.evaluate(() => {
+      const cu = (window as any).cu;
+      const els = cu.scan(cu.browserHost(), document.body, { skip: [], maxTasks: 5000 }).map((p: any) => p.el);
+      return els.filter((e: Element) => e.closest('#layout')).map((e: Element) => e.textContent);
+    });
+    expect(inside).toEqual(['one', 'two']);
+  });
+});
+
 test.describe('big', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/fixtures/big.html');

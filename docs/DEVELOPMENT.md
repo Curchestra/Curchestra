@@ -17,7 +17,7 @@ npx playwright install
 | `npm test` | Unit tests (Vitest). |
 | `npm run test:e2e` | Browser tests (Playwright: Chromium, Firefox, WebKit). |
 | `npm run test:perf` | Timing tests, run one at a time. |
-| `npm run size` | Checks bundle size against the budget (21 kB core). |
+| `npm run size` | Checks bundle size against the budget (21.5 kB core). |
 | `npm run bench` | Benchmarks against Swarm Rebuild and rewrites `bench/results.md`. Run `npm run build` first. |
 | `npm run sri` | Prints the integrity string for `dist/curchestra.js`. |
 

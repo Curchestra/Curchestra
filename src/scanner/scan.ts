@@ -41,10 +41,10 @@ function hasDirectText(el: Element): boolean {
   return false;
 }
 
-function hasBlockChild(el: Element, win: Window): boolean {
+function hasBlockChild(el: Element, win: Window, flexy = false): boolean {
   for (let c = el.firstElementChild; c; c = c.nextElementSibling) {
-    if (c.localName === 'br') continue;
-    if (!INLINE_DISPLAY.has(win.getComputedStyle(c).display)) return true;
+    if (c.localName === 'br' || INLINE_DISPLAY.has(win.getComputedStyle(c).display)) continue;
+    if (!flexy || (!MEDIA_TAGS.has(c.localName) && hasBlockChild(c, win))) return true;
   }
   return false;
 }
@@ -90,7 +90,7 @@ export function scan(host: Host, root: Element, opts: { skip: string[]; maxTasks
       kind = 'media';
     } else if (hasBgImage && !NON_SPACE.test(el.textContent || '')) {
       kind = 'media';
-    } else if (hasDirectText(el) && !hasBlockChild(el, win)) {
+    } else if (hasDirectText(el) && !hasBlockChild(el, win, /flex|grid/.test(cs.display))) {
       kind = 'text';
       textLen = (el.textContent || '').trim().length;
       fontPx = parseFloat(cs.fontSize) || undefined;
